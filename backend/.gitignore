@@ -6,7 +6,7 @@ dist
 # Keep environment variables out of version control
 .env
 
-/generated/prisma
+/src/generated/prisma
 
 
 # AI Agent Skills (Prisma / NestJS CLI)

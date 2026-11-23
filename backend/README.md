@@ -31,6 +31,24 @@
 $ npm install
 ```
 
+## Environment variables
+
+Copy `.env.example` to `.env` and fill in a real `DATABASE_URL` (a local or
+hosted PostgreSQL connection string). Every variable is validated at startup
+— see `src/config/env.schema.ts` — so a missing or malformed value fails
+immediately with a clear error instead of surfacing later as a confusing
+runtime failure.
+
+| Variable | Required | Default | Notes |
+|---|---|---|---|
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
+| `PORT` | No | `3000` | HTTP port the API listens on |
+| `NODE_ENV` | No | `development` | One of `development`, `test`, `production` |
+
+Prisma's own CLI (`npx prisma generate`, migrations, etc.) loads
+`DATABASE_URL` separately via `prisma7.config.ts` — both reads come from the
+same `.env` file, so you only maintain one copy of it.
+
 ## Compile and run the project
 
 ```bash

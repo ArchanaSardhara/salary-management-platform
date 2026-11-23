@@ -17,7 +17,15 @@ const config: Config = {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
-  moduleNameMapper: pathsToModuleNameMapper(paths, { prefix: '<rootDir>/' }),
+  moduleNameMapper: {
+    // TS "nodenext" modules (e.g. the generated Prisma client) import
+    // local siblings with an explicit ".js" extension that resolves to the
+    // ".ts" source at compile/run time. Jest's resolver doesn't know that
+    // convention on its own, so map it here — otherwise any such import
+    // fails with "Cannot find module './x.js'" even though `tsc` is fine.
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    ...pathsToModuleNameMapper(paths, { prefix: '<rootDir>/' }),
+  },
   collectCoverageFrom: [
     'src/**/*.(t|j)s',
     'libs/**/*.(t|j)s',
