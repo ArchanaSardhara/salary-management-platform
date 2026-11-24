@@ -9,6 +9,7 @@ import { PrismaModule } from './modules/prisma/prisma.module';
 import { AuthModule } from './modules/api/auth/auth.module';
 import { UsersModule } from './modules/api/users/users.module';
 import { EmployeesModule } from './modules/api/employees/employees.module';
+import { CompensationModule } from './modules/api/compensation/compensation.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { EmployeesModule } from './modules/api/employees/employees.module';
     AuthModule,
     UsersModule,
     EmployeesModule,
+    CompensationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

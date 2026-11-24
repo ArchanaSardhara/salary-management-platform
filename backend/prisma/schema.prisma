@@ -99,9 +99,61 @@ model Employee {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
+  compensationRecords CompensationRecord[]
+
   @@index([deletedAt])
   @@index([countryCode])
   @@index([department])
   @@index([jobTitle])
   @@map("employees")
+}
+
+/// A single monthly salary record for an employee. Records are append-only;
+/// creating a new one does not automatically close the previous one —
+/// effectiveTo is user-supplied and can differ from the next record's
+/// effectiveFrom (gaps are allowed). effectiveTo IS NULL means the record is
+/// currently active.
+model CompensationRecord {
+  id         String   @id @default(cuid())
+  employeeId String   @map("employee_id")
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  /// Monthly gross salary amount; stored as an exact decimal, never float.
+  amount       Decimal  @db.Decimal(14, 2)
+  /// ISO 4217 currency code, validated against the list in
+  /// src/common/constants/currency-codes.ts.
+  currencyCode String   @map("currency_code") @db.Char(3)
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  /// null means this record is currently active (no end date yet).
+  effectiveTo  DateTime? @map("effective_to") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  auditLog AuditLog?
+
+  @@index([employeeId, effectiveFrom])
+  @@index([employeeId, effectiveTo])
+  @@map("compensation_records")
+}
+
+/// One immutable row per CompensationRecord write, capturing who changed
+/// compensation and what changed. Written in the same transaction as its
+/// CompensationRecord; never updated or deleted.
+model AuditLog {
+  id                   String             @id @default(cuid())
+  compensationRecordId String             @unique @map("compensation_record_id")
+  compensationRecord   CompensationRecord @relation(fields: [compensationRecordId], references: [id])
+
+  /// ID of the User who recorded the salary change.
+  changedBy String   @map("changed_by")
+  changedAt DateTime @default(now()) @map("changed_at")
+
+  /// Snapshot of the employee's previous compensation; null for the first
+  /// compensation record.
+  beforeValue Json? @map("before_value") @db.JsonB
+  /// Snapshot of the newly created compensation record.
+  afterValue  Json  @map("after_value") @db.JsonB
+
+  @@map("audit_logs")
 }

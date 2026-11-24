@@ -699,3 +699,91 @@ Actually executed in `backend/`:
 - Migration still **not applied** to the database.
 
 [human note: Implemented Employee Management with create, read, update, soft delete, and restore functionality. Added server-generated employee codes, validation, pagination, role-based access, and optimistic concurrency handling.]
+
+---
+
+## 8. Compensation and audit-log module
+
+**Date:** 2026-11-24
+
+### What was asked
+
+> "Now add Compensation and AUDIT_LOG tables and crud on them."
+> Clarifications: last effectiveTo and new effectiveFrom are independent
+> (user-supplied, gaps allowed); currency codes in a single shared file;
+> amount is monthly basis; backdating is allowed.
+
+### What AI generated
+
+- `src/common/constants/currency-codes.ts` — single source of truth for the
+  ISO 4217 active currency code list (used by the DTO's `@IsIn` check).
+- `prisma/schema.prisma` — added `CompensationRecord` and `AuditLog` models,
+  and a `compensationRecords` relation on `Employee`.
+- `prisma/migrations/20261124150000_add_compensation_and_audit/migration.sql`
+  — creates `compensation_records` and `audit_logs` tables with the correct
+  column types, indexes, and foreign keys. **Not yet applied to Neon.**
+- Compensation module under `src/modules/api/compensation/`:
+  - `compensation.constants.ts` — messages, `AMOUNT_MIN`/`MAX`, re-exports
+    `CURRENCY_CODES`.
+  - `dto/create-compensation.dto.ts` — `amount` (number, > 0, ≤ 2dp, ≤ 10M),
+    `currencyCode` (ISO 4217, uppercased), `effectiveFrom` (date string),
+    `effectiveTo?` (optional date string or null).
+  - `dto/list-compensation-query.dto.ts` — `page` / `pageSize`.
+  - `dto/compensation-response.dto.ts` — `CompensationResponse`,
+    `PaginatedCompensationResponse`, `AuditLogResponse`,
+    `toCompensationResponse` (amount formatted with `.toFixed(2)`),
+    `toCompensationSnapshot`, `toAuditLogResponse`.
+  - `compensation.service.ts` — `create` (employee check, overlap detection,
+    transaction writes record + audit log with before/after snapshots),
+    `findAll`, `findCurrent`, `findOne`, `findAuditLog`.
+  - `compensation.controller.ts` — routes nested under
+    `employees/:employeeId/compensation`: POST (201), GET list, GET `current`,
+    GET `:recordId`, GET `:recordId/audit`. All require `HR_MANAGER` role.
+  - `compensation.module.ts`, registered in `app.module.ts`.
+  - `compensation.service.spec.ts` — unit tests for all service methods,
+    including overlap detection, `Prisma.JsonNull` for null before-value,
+    employee-not-found and employee-deleted guards, end-before-start 400.
+  - `compensation.controller.spec.ts` — HTTP tests: 401/403 on every route,
+    validation 400s (amount, currency, dates, unknown fields), normalisation
+    (currency uppercased), nullable `effectiveTo`, pagination bounds.
+
+### Technical decisions
+
+- `effectiveTo` is fully user-supplied; closing a previous record is not
+  automatic. Gaps between salary periods are allowed.
+- Overlap validation rejects any new period that overlaps an existing record
+  for the same employee. When `effectiveTo` is null the overlap check omits
+  the upper-bound filter (open-ended = covers all future dates).
+- `beforeValue` = the most recently created compensation record for the
+  employee at time of write (null for the first record); `afterValue` = the
+  new record. Both stored as `JSONB` snapshots.
+- `Decimal.toFixed(2)` used for amount serialisation so `'5000.00'` is
+  returned, not `'5000'` (trailing-zero stripping by `Decimal.toString()`).
+- Prisma's `Prisma.JsonNull` used to store an explicit SQL NULL in the
+  nullable `before_value` JsonB column.
+- `GET .../current` route registered before `GET .../:recordId` in the
+  controller so NestJS matches the literal string first.
+
+### Files created or modified
+
+- **New:** `src/common/constants/currency-codes.ts`
+- **New:** `prisma/migrations/20261124150000_add_compensation_and_audit/migration.sql`
+- **New:** `src/modules/api/compensation/` (8 files: constants, 3 DTOs,
+  service, controller, module, 2 specs)
+- **Modified:** `prisma/schema.prisma` (CompensationRecord + AuditLog models,
+  Employee relation)
+- **Modified:** `src/app.module.ts` (CompensationModule registered)
+
+### Test and verification results
+
+Actually executed in `backend/`:
+
+- `npx prisma validate`: valid.
+- `npx prisma generate`: succeeded (CompensationRecord + AuditLog types
+  available).
+- `npx tsc --noEmit`: no errors.
+- `npm test`: **22/22 suites, 260/260 tests pass.**
+- `npm run lint` (type-aware): not run — same `tsgolint.exe` failure.
+- Migration not yet applied to Neon.
+
+[human note: ]
