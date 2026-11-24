@@ -1,8 +1,15 @@
-import { INestApplication, UnauthorizedException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  INestApplication,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { configureApp } from '../../../app.setup';
+import { Role } from '../../../common/authorization/role.enum';
+import type { IUser } from '../users/entities/user.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -23,7 +30,26 @@ describe('AuthController (HTTP)', () => {
     forgotPassword: jest.fn(),
     resetPassword: jest.fn(),
   };
-  const guard = { canActivate: jest.fn() };
+  /**
+   * Stands in for JwtAuthGuard: sets request.user from test state (like the
+   * real JwtStrategy does from the database), so the real RolesGuard runs.
+   */
+  let currentUser: IUser | undefined;
+  const guard = {
+    canActivate: jest.fn((context: ExecutionContext) => {
+      context.switchToHttp().getRequest<{ user?: IUser }>().user = currentUser;
+      return true;
+    }),
+  };
+  const activeUser = (role: Role): IUser => ({
+    id: 'user-1',
+    firstName: 'Ada',
+    lastName: null,
+    email: 'ada@example.com',
+    emailVerified: false,
+    role,
+    isActive: true,
+  });
 
   const registerBody = {
     firstName: 'Ada',
@@ -52,6 +78,7 @@ describe('AuthController (HTTP)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    currentUser = undefined;
   });
 
   function cookiesOf(res: request.Response): string[] {
@@ -102,6 +129,15 @@ describe('AuthController (HTTP)', () => {
       expect(cookies).toHaveLength(1);
       expect(cookies[0]).toMatch(/^access_token=access;/);
     });
+
+    it('rejects a client-supplied role with 400', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ ...registerBody, role: Role.ADMIN })
+        .expect(400);
+
+      expect(authService.register).not.toHaveBeenCalled();
+    });
   });
 
   describe('POST /auth/login', () => {
@@ -133,6 +169,19 @@ describe('AuthController (HTTP)', () => {
       expect(cookiesOf(res)).toHaveLength(0);
     });
 
+    it('returns 403 without cookies for a deactivated account', async () => {
+      authService.login.mockRejectedValue(
+        new ForbiddenException('Account is deactivated'),
+      );
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'ada@example.com', password: 'password123' })
+        .expect(403);
+
+      expect(cookiesOf(res)).toHaveLength(0);
+    });
+
     it('rejects an invalid request body with 400', async () => {
       await request(app.getHttpServer())
         .post('/auth/login')
@@ -144,19 +193,39 @@ describe('AuthController (HTTP)', () => {
   });
 
   describe('GET /auth/verify', () => {
-    it('returns the authenticated user when the guard allows the request', async () => {
-      guard.canActivate.mockReturnValue(true);
-      authService.verify.mockResolvedValue({ id: 'user-1' });
+    it.each([Role.HR_MANAGER, Role.ADMIN])(
+      'returns the authenticated %s user from request.user',
+      async (role) => {
+        currentUser = activeUser(role);
+        authService.verify.mockImplementation((user: IUser) => user);
+
+        const res = await request(app.getHttpServer())
+          .get('/auth/verify')
+          .expect(200);
+
+        expect(authService.verify).toHaveBeenCalledWith(currentUser);
+        expect(res.body).toEqual(currentUser);
+      },
+    );
+
+    it('returns 401 when no user is authenticated', async () => {
+      await request(app.getHttpServer()).get('/auth/verify').expect(401);
+      expect(authService.verify).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 for a deactivated user', async () => {
+      currentUser = { ...activeUser(Role.HR_MANAGER), isActive: false };
 
       const res = await request(app.getHttpServer())
         .get('/auth/verify')
-        .expect(200);
+        .expect(403);
 
-      expect(res.body).toEqual({ id: 'user-1' });
+      expect(JSON.stringify(res.body)).toContain('Account is deactivated');
+      expect(authService.verify).not.toHaveBeenCalled();
     });
 
-    it('returns 403 when the guard rejects the request', async () => {
-      guard.canActivate.mockReturnValue(false);
+    it('returns 403 when the JWT guard rejects the request', async () => {
+      guard.canActivate.mockReturnValueOnce(false);
 
       await request(app.getHttpServer()).get('/auth/verify').expect(403);
       expect(authService.verify).not.toHaveBeenCalled();
@@ -176,6 +245,17 @@ describe('AuthController (HTTP)', () => {
         'raw-refresh',
         expect.anything(),
       );
+    });
+
+    it('returns 403 when the account is deactivated', async () => {
+      authService.refresh.mockRejectedValue(
+        new ForbiddenException('Account is deactivated'),
+      );
+
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .set('Cookie', 'refresh_token=raw-refresh')
+        .expect(403);
     });
   });
 

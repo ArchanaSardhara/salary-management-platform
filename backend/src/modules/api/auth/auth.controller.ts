@@ -21,6 +21,10 @@ import {
   REFRESH_TOKEN_AGE,
 } from '../../../common/consts/config';
 
+import { Role } from '../../../common/authorization/role.enum';
+import { Roles } from '../../../common/authorization/roles.decorator';
+import { RolesGuard } from '../../../common/authorization/roles.guard';
+import type { IUser } from '../users/entities/user.entity';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
@@ -84,9 +88,10 @@ export class AuthController {
   }
 
   @Get('verify')
-  @UseGuards(JwtAuthGuard)
-  verify(@Req() req: Request) {
-    return this.authService.verify(req);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HR_MANAGER, Role.ADMIN)
+  verify(@Req() req: Request & { user: IUser }) {
+    return this.authService.verify(req.user);
   }
 
   @Post('refresh')

@@ -1,7 +1,8 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import type { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import type { Response } from 'express';
+import { Role } from '../../../common/authorization/role.enum';
 import { hashToken } from '../../../common/utils/token.util';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { UsersService } from '../users/users.service';
@@ -47,7 +48,10 @@ describe('AuthService', () => {
     email: 'ada@example.com',
     passwordHash: 'stored-hash',
     emailVerified: false,
+    role: Role.HR_MANAGER,
+    isActive: true,
   };
+  const deactivatedUser = { ...user, isActive: false };
 
   const originalEnv = process.env;
 
@@ -166,11 +170,33 @@ describe('AuthService', () => {
       );
       expect(jwtService.signAsync).not.toHaveBeenCalled();
     });
+
+    it('throws 403 for a deactivated user with the correct password', async () => {
+      usersService.findByEmail.mockResolvedValue(deactivatedUser);
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.login(dto)).rejects.toThrow(
+        new ForbiddenException('Account is deactivated'),
+      );
+      expect(jwtService.signAsync).not.toHaveBeenCalled();
+      expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+    });
+
+    it('does not reveal deactivation when the password is wrong', async () => {
+      usersService.findByEmail.mockResolvedValue(deactivatedUser);
+      (argon2.verify as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login(dto)).rejects.toThrow(
+        new UnauthorizedException('Invalid credentials'),
+      );
+    });
   });
 
   describe('verify', () => {
-    it('returns the user attached to the request by the JWT guard', async () => {
-      await expect(service.verify({ user })).resolves.toBe(user);
+    it('returns the authenticated user it is given', () => {
+      const { passwordHash: _omit, ...authenticated } = user;
+
+      expect(service.verify(authenticated)).toBe(authenticated);
     });
   });
 
@@ -206,6 +232,16 @@ describe('AuthService', () => {
         (data.expiresAt.getTime() - data.createdAt.getTime()) / 60_000;
       expect(minutes).toBeCloseTo(15, 0);
     });
+
+    it('returns the generic message without creating a token for a deactivated user', async () => {
+      usersService.findByEmail.mockResolvedValue(deactivatedUser);
+
+      await expect(service.forgotPassword(user.email)).resolves.toEqual(
+        genericMessage,
+      );
+      expect(prisma.passwordResetToken.updateMany).not.toHaveBeenCalled();
+      expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('resetPassword', () => {
@@ -214,6 +250,7 @@ describe('AuthService', () => {
       userId: 'user-1',
       usedAt: null,
       expiresAt: new Date(Date.now() + 60_000),
+      user,
     };
 
     it('looks the token up by its hash, updates the password and revokes sessions', async () => {
@@ -250,6 +287,10 @@ describe('AuthService', () => {
       [
         'has expired',
         { ...validToken, expiresAt: new Date(Date.now() - 1000) },
+      ],
+      [
+        'belongs to a deactivated user',
+        { ...validToken, user: deactivatedUser },
       ],
     ])('rejects a token that %s', async (_label, stored) => {
       prisma.passwordResetToken.findUnique.mockResolvedValue(stored);
@@ -316,6 +357,24 @@ describe('AuthService', () => {
         service.refresh('raw-refresh', res as unknown as Response),
       ).rejects.toThrow(new UnauthorizedException('Refresh token expired'));
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('revokes every session and throws 403 for a deactivated user', async () => {
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        ...storedToken,
+        user: deactivatedUser,
+      });
+
+      await expect(
+        service.refresh('raw-refresh', res as unknown as Response),
+      ).rejects.toThrow(new ForbiddenException('Account is deactivated'));
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+      expect(jwtService.signAsync).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(res.cookie).not.toHaveBeenCalled();
     });
 
     it('rotates the refresh token and sets new httpOnly cookies', async () => {

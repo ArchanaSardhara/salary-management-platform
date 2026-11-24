@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 
@@ -16,6 +20,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { generateToken, hashToken } from '../../../common/utils/token.util';
 import type { Response } from 'express';
 // import { EmailService } from '../notifications/email/email.service';
+
+const ACCOUNT_DEACTIVATED = 'Account is deactivated';
 
 @Injectable()
 export class AuthService {
@@ -117,17 +123,24 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Checked only after a correct password, so deactivation is not revealed
+    // to someone who doesn't know the password.
+    if (!user.isActive) {
+      throw new ForbiddenException(ACCOUNT_DEACTIVATED);
+    }
+
     return await this.generateTokens(user, data.rememberMe);
   }
 
-  async verify(req: any) {
-    return req.user;
+  verify(user: IUser): IUser {
+    return user;
   }
 
   async forgotPassword(email: string) {
     const user = await this.usersService.findByEmail(email);
 
-    if (!user) {
+    // Deactivated users get the same response but no reset token.
+    if (!user || !user.isActive) {
       return {
         message: 'If an account exists, a password reset email has been sent.',
       };
@@ -190,6 +203,11 @@ export class AuthService {
     }
 
     if (resetToken.expiresAt <= new Date()) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    // Same error as an invalid token, so deactivation is not revealed.
+    if (!resetToken.user.isActive) {
       throw new UnauthorizedException('Invalid or expired reset token');
     }
 
@@ -259,6 +277,12 @@ export class AuthService {
 
     if (storedToken.expiresAt <= new Date()) {
       throw new UnauthorizedException('Refresh token expired');
+    }
+
+    if (!storedToken.user.isActive) {
+      await this.revokeAllUserTokens(storedToken.userId);
+
+      throw new ForbiddenException(ACCOUNT_DEACTIVATED);
     }
 
     const newRefreshToken = generateToken();

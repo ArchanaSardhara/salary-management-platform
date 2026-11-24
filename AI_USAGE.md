@@ -170,3 +170,369 @@ against a running Postgres) before relying on it in a deployed environment.
   decisions" above) — needed once the first write endpoint is built.
 
 [human note: ]
+
+---
+
+## 2. Backend unit and HTTP tests for auth, users, email and common utilities
+
+### What was asked
+
+"add test missing test in backend/src/" — add tests for source files in
+`backend/src` that had none. The auth, users and email modules (committed in
+`24e84aa`) had been written without tests.
+
+### What AI generated
+
+New test files (all AI-generated):
+
+- `src/common/utils/token.util.spec.ts` — token format/randomness, SHA-256
+  hashing.
+- `src/common/utils/email-template.utils.spec.ts` — `{{$key}}` placeholder
+  replacement, whitespace, repeats, unknown keys.
+- `src/common/utils/common.utils.spec.ts` — `generateSlug` cases.
+- `src/modules/api/users/users.service.spec.ts` — create (hashes password,
+  strips hash from result, 409 on duplicate email), find by email/id/all.
+  Prisma and argon2 are mocked.
+- `src/modules/api/auth/auth.service.spec.ts` — register, login (same error
+  for unknown user and wrong password), forgot password (generic message,
+  hashed 15-minute token), reset password (used/expired/unknown token,
+  password update and session revocation in one transaction), refresh
+  (missing/unknown/expired token, reuse detection revoking all sessions,
+  rotation and cookies), logout. Prisma, JwtService and argon2 are mocked.
+- `src/modules/api/auth/jwt.strategy.spec.ts` — `validate` returns the user
+  or null.
+- `src/modules/api/auth/dto/auth-dtos.spec.ts` — class-validator rules for
+  the register, login, forgot-password and reset-password DTOs.
+- `src/modules/api/auth/auth.controller.spec.ts` — Supertest HTTP tests for
+  every `/auth` route against a Nest app with a mocked `AuthService` and
+  `JwtAuthGuard`, using the same global exception filter as `main.ts`.
+- `src/modules/api/notifications/email/email.service.spec.ts` — Resend
+  mocked; success, Resend error, reset link encoding, missing `APP_URL`.
+
+Fixed pre-existing broken specs:
+
+- `src/config/env.validation.spec.ts` — the valid config lacked the new
+  required `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET`; added them, updated
+  the expected defaults, and added missing/too-short secret cases.
+- `src/modules/api/health/health.controller.spec.ts` — provided mocks for
+  the terminus dependencies (the suite could not start before) and tested
+  `live`/`ready`.
+- `src/app.controller.spec.ts` — was an empty `describe` (Jest refuses to
+  run it); now checks the controller is created.
+
+### Files changed
+
+All under `backend/src/`: the 9 new spec files above, plus
+`config/env.validation.spec.ts`, `modules/api/health/health.controller.spec.ts`
+and `app.controller.spec.ts`. No application code was changed.
+
+### Technical decisions
+
+- Services are unit-tested with plain object mocks passed to the
+  constructor instead of a Nest testing module — no database needed.
+- The controller is tested over real HTTP with Supertest so cookie handling,
+  status codes and request parsing are exercised the way a client sees them.
+- Tests assert intended behaviour. Where the implementation is wrong, the
+  test was left failing rather than rewritten to match (CLAUDE.md testing
+  rule).
+- Refresh-token expiry tests set `JWT_REFRESH_EXPIRES_IN='7'`, because the
+  service reads that variable as a number of days (see known gaps).
+
+### Debugging and problem-solving
+
+- Before this task the suite had 3 failing suites (stale env spec, health
+  controller spec missing providers, empty app controller spec). All three
+  now pass.
+- The new HTTP tests surfaced real bugs, listed under known gaps.
+
+### Test and verification results
+
+Actually executed:
+
+- `npm test` in `backend/`: **14 of 15 suites pass; 86 of 89 tests pass;
+  3 fail**, all in `auth.controller.spec.ts`:
+  - `POST /auth/login` with an invalid body returns 401 instead of 400 —
+    the body reached `AuthService.login`, because no `ValidationPipe` is
+    registered (not in `main.ts`, not on the controller).
+  - `POST /auth/refresh` and `POST /auth/logout` with a `refresh_token`
+    cookie return 500 — `req.cookies` is undefined because no cookie parser
+    (e.g. `cookie-parser`) is installed or registered.
+- `npx tsc --noEmit -p tsconfig.json`: no errors.
+- `npx oxlint` on the new/changed spec files: no findings. The
+  `--type-aware` mode used by `npm run lint` failed to start
+  (`tsgolint.exe` spawn error) on this machine, so type-aware lint was not
+  run.
+- `npm run test:e2e` was not run (it needs a database).
+
+### Outstanding issues / known gaps
+
+Bugs found in the implementation (not fixed — awaiting developer decision):
+
+- No global `ValidationPipe`, so none of the DTO rules are enforced at
+  runtime.
+- No cookie parser, so `/auth/refresh` and `/auth/logout` crash, and
+  `JwtStrategy` (which reads `req.cookies.access_token`) can never find a
+  token, so `/auth/verify` always rejects.
+- `JWT_ACCESS_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN`: the env schema
+  defaults them to `'15m'`, but the service does `Number(value)` and treats
+  it as days. With `'15m'` that gives `NaN` (`'NaNd'` as the JWT expiry and
+  an invalid refresh-token `expiresAt`). When the variable is unset in
+  `process.env`, the fallback adds `REFRESH_TOKEN_AGE` (milliseconds) as a
+  number of days.
+- `POST /auth/register` and `/auth/login` call `res.status().json()` while
+  using `@Res({ passthrough: true })`; it works in the tests, but mixing
+  the two is fragile.
+- `EmailService.sendEmail` sends every email to `EMAIL_ACCOUNT` instead of
+  the recipient (looks like a dev override), and password-reset email
+  sending is commented out in `AuthService.forgotPassword`.
+
+[human note: ]
+
+---
+
+## 3. Fix failing AuthController HTTP tests by sharing the app setup
+
+### What was asked
+
+"fix test case on backend/src/modules/api/auth/auth.controller.spec.ts" —
+the 3 failing tests from entry 2 (invalid body returned 401 instead of 400;
+`/auth/refresh` and `/auth/logout` returned 500).
+
+### What AI generated vs developer changes
+
+- **Developer:** installed `cookie-parser` (+ `@types/cookie-parser`) and
+  added `app.use(cookieParser())` and a global
+  `ValidationPipe({ whitelist, forbidNonWhitelisted, transform })` to
+  `src/main.ts`. This fixed the two bugs found in entry 2 for the running
+  app.
+- **AI:** the test still failed because it built its own Nest app without
+  that setup. Moved the global setup (cookie parser, `ValidationPipe`,
+  `AllExceptionsFilter`, `LoggingInterceptor`) from `main.ts` into
+  `configureApp()` in the new `src/app.setup.ts`. `main.ts` and
+  `auth.controller.spec.ts` both call it. The setup itself is unchanged.
+
+### Files changed
+
+- `backend/src/app.setup.ts` (new)
+- `backend/src/main.ts` — now calls `configureApp(app)`
+- `backend/src/modules/api/auth/auth.controller.spec.ts` — uses
+  `configureApp(app)` instead of registering only the exception filter.
+  No assertions were changed.
+
+### Technical decisions
+
+- A shared function was chosen over copying the setup into the test, so the
+  HTTP tests cannot drift from production config (CLAUDE.md: avoid
+  duplicate logic).
+- The tests' expectations were not loosened; they now pass because the app
+  behaves correctly.
+
+### Test and verification results
+
+Actually executed:
+
+- `npm test` in `backend/`: **15/15 suites, 89/89 tests pass.**
+- `npx tsc --noEmit -p tsconfig.json`: no errors.
+- The app was not started against a real database; `test:e2e` was not run.
+
+### Outstanding issues / known gaps
+
+Still open from entry 2: the `JWT_*_EXPIRES_IN` format mismatch (`'15m'`
+default vs. numeric days in `AuthService`), `EmailService` sending to
+`EMAIL_ACCOUNT` instead of the recipient, password-reset email sending
+commented out, and `register`/`login` mixing `res.json()` with
+`passthrough: true`.
+
+[human note: ]
+
+---
+
+## 4. Role-based access control (RBAC) infrastructure
+
+### What was asked
+
+Implement reusable RBAC for the backend with roles `HR_MANAGER` (employee,
+compensation, directory, analytics) and `ADMIN` (HR user management only),
+with neither role reaching the other's APIs. Requirements: a `@Roles()`
+decorator, a reusable `RolesGuard`, roles read from trusted server-side
+request context, 401 for unauthenticated and 403 for unauthorized requests,
+deactivated users blocked, and unit tests. Constraints: no authentication or
+session changes, no Prisma schema or database changes, no employee or
+compensation logic. A plan had to be approved before coding.
+
+### Developer decisions (answered before implementation)
+
+- `ADMIN` is in scope, even though `requirements.md` defers multiple roles
+  and `feature-plan.md` assumes no Admin account. The docs were not
+  rewritten; the developer will update them.
+- Roles and active status are read from a typed `request.user`. Because the
+  `User` model has neither field and the schema must not change, the guard
+  denies access when they are missing.
+- Deactivated users get 403 ("Account is deactivated"), not 401.
+- Routes use `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(...)`, not a
+  combined decorator.
+
+### What AI generated
+
+In `backend/src/common/authorization/`:
+
+- `role.enum.ts` — `Role` enum and an `isRole` type guard.
+- `authenticated-user.interface.ts` — the `request.user` contract
+  (`id`, optional `role`, optional `isActive`).
+- `roles.decorator.ts` — `@Roles(role, ...roles)`; at least one role is
+  required by its type signature.
+- `roles.guard.ts` — `RolesGuard`. With no `@Roles` it allows the request.
+  Otherwise: no user → 401; `isActive === false` → 403 "Account is
+  deactivated"; `isActive` not `true`, missing or unknown role, or a role
+  not listed → 403. A handler-level `@Roles` overrides the controller's.
+- `roles.decorator.spec.ts`, `roles.guard.spec.ts` — unit tests.
+- `roles.guard.http.spec.ts` — Supertest tests with test-only controllers
+  and a fake auth guard that sets `request.user` from test state, run
+  through the real `configureApp` setup, so the actual HTTP status codes
+  are checked.
+
+Docs: `docs/backend-architecture.md` §5 (how to use the guard) and §6 (role
+model gap updated to the current state).
+
+### Files changed
+
+- New: the 7 files above under `backend/src/common/authorization/`.
+- Modified: `docs/backend-architecture.md`, `AI_USAGE.md`.
+- Not touched: `prisma/schema.prisma`, migrations, `JwtStrategy`,
+  `AuthModule`, any controller. No route is marked with `@Roles` yet,
+  because no employee, compensation or admin APIs exist.
+
+### Technical decisions
+
+- Not registered as a global guard: a global guard would run before the
+  controller-level `JwtAuthGuard`, so `request.user` would never be set yet.
+- Fails closed: missing `role` or `isActive` means 403, so protected routes
+  can't open by accident before authentication provides those fields.
+- `Role` is a TypeScript enum for now. It should be replaced by a Prisma
+  enum when the schema gains a role column.
+- One role per user, following product-discovery's "every user carries a
+  role".
+
+### Test and verification results
+
+Actually executed in `backend/`:
+
+- `npm test`: **18/18 suites, 120/120 tests pass** (31 new tests in the 3
+  authorization specs).
+- `npx tsc --noEmit -p tsconfig.json`: no errors. This includes the
+  `@ts-expect-error` check that an empty `@Roles()` does not compile.
+- `npx oxlint src/common/authorization`: no findings.
+- `npm run lint` (`oxlint --type-aware`): **did not run** — the
+  `tsgolint.exe` binary fails to start on this machine (same environment
+  error as in entry 2). Type-aware lint is unverified.
+
+### Outstanding issues / known gaps
+
+- Until the `User` model gains `role` and active-status columns (a schema
+  change) and `JwtStrategy` returns them, every `@Roles` route returns 403
+  for every user. Integrating with authentication is a separate task.
+- `requirements.md` and `feature-plan.md` still describe a single HR role
+  with no Admin. The developer needs to update them.
+- Admin user-management endpoints (list, create, update, deactivate) are
+  not implemented; only the access-control infrastructure exists.
+
+[human note: ]
+
+---
+
+## 5. Integrate RBAC with the auth endpoints
+
+### What was asked
+
+"integrate this RBAC with auth endpoints such as login, verify, refresh,
+reset-password" — connect the `RolesGuard` / `@Roles` infrastructure from
+entry 4 to the real authentication flow.
+
+### Developer decisions (answered before implementation)
+
+- **Schema change approved:** add a Prisma `Role` enum, `role` (default
+  `HR_MANAGER`) and `isActive` (default `true`) to `User`, with a migration.
+- **Register:** stays public but always creates `HR_MANAGER`; a role in the
+  request body is rejected.
+- **Deactivated users:** blocked in every flow. Login reveals deactivation
+  (403) only after a correct password. Refresh revokes all sessions and
+  returns 403. Forgot-password gives the same generic message but issues no
+  token. Reset-password returns the same "invalid or expired" error.
+- **Verify:** protected by `JwtAuthGuard` + `RolesGuard` +
+  `@Roles(HR_MANAGER, ADMIN)`. Role and active status come from the
+  database on every request, not from the JWT.
+
+### What AI generated
+
+- `prisma/schema.prisma` — `enum Role { HR_MANAGER ADMIN }`;
+  `User.role Role @default(HR_MANAGER)`;
+  `User.isActive Boolean @default(true) @map("is_active")`.
+- `prisma/migrations/20261124120000_add_user_role_and_active/migration.sql`
+  — generated with `prisma migrate diff` (committed schema → new schema),
+  because diffing from the migrations folder needs a shadow database.
+- `common/authorization/role.enum.ts` — now re-exports the Prisma `Role`
+  instead of defining its own enum, so there is one source of truth.
+- `common/authorization/authenticated-user.interface.ts` — comment updated.
+- `users/entities/user.entity.ts` — `IUser` gains `role` and `isActive`.
+- `users/users.service.ts` — `create` sets `role: HR_MANAGER` explicitly on
+  the server.
+- `auth/auth.service.ts` — the deactivation checks in login, refresh,
+  forgot-password and reset-password described above; `verify(user: IUser)`
+  replaces `verify(req: any)`, which removes an `any`.
+- `auth/auth.controller.ts` — `verify` uses
+  `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(HR_MANAGER, ADMIN)` and
+  passes `req.user` to the service.
+- Tests updated: `auth.service.spec.ts` (deactivated user in login, forgot,
+  reset and refresh; login not revealing deactivation on a wrong password),
+  `auth.controller.spec.ts` (the fake `JwtAuthGuard` now sets `req.user` so
+  the real `RolesGuard` runs; verify returns 200 for both roles, 401 with no
+  user, 403 when deactivated; register rejects `role` in the body with 400;
+  login and refresh map deactivation to 403), `users.service.spec.ts`
+  (role set on create).
+- Docs: `backend/README.md` gained a "Database migrations" section (a new
+  setup step); `docs/backend-architecture.md` §6 role-model note updated.
+
+### Technical decisions
+
+- Role is **not** put in the JWT. `JwtStrategy` already reloads the user
+  from the database on every request, so role changes and deactivation
+  take effect immediately.
+- A client-supplied `role` is rejected by the existing global
+  `ValidationPipe` (`forbidNonWhitelisted`), because `RegisterDto` has no
+  `role` field. `UsersService.create` also hard-codes the role.
+- `logout` was left unchanged; deactivated users can still clear their own
+  cookies and tokens.
+
+### Test and verification results
+
+Actually executed in `backend/`:
+
+- `npx prisma generate`: succeeded; the client includes `Role`.
+- `npm test`: **18/18 suites, 131/131 tests pass.**
+- `npx tsc --noEmit -p tsconfig.json`: no errors.
+- `npx oxlint` on `src/common/authorization`, `src/modules/api/auth` and
+  `src/modules/api/users`: no errors. There are 10 unused-import
+  **warnings** in `users.controller.ts` and `users.service.ts`; they were
+  already there before this task and were left alone.
+- `npm run lint` (type-aware): **did not run** — the same `tsgolint.exe`
+  start-up failure as before.
+- `npx prisma migrate status`: at first the new migration was **not
+  applied**; AI did not apply it unasked, since the database is a hosted
+  Neon instance. After the developer approved, AI ran
+  `npx prisma migrate deploy`, which reported "No pending migrations to
+  apply" (it had already been applied outside this session). After that,
+  `migrate status` reported "Database schema is up to date!", and
+  `prisma migrate diff --from-config-datasource --to-schema` produced an
+  empty migration, so the live database matches `schema.prisma`.
+
+### Outstanding issues / known gaps
+
+- No admin-management API yet (create HR users, change role, deactivate).
+  `ADMIN` accounts can only be made by editing the database.
+- `requirements.md` and `feature-plan.md` still describe a single HR role.
+- Still open from entry 2: the `JWT_*_EXPIRES_IN` format mismatch and
+  `EmailService` sending to `EMAIL_ACCOUNT`.
+
+[human note: Integrated RBAC into the authentication flow with HR_MANAGER and ADMIN roles. Added secure handling for deactivated users across login, verify, refresh, and password reset flows. Updated tests and documentation.
+
+Verification: All tests passed, TypeScript compilation passed. Database migration is generated.]

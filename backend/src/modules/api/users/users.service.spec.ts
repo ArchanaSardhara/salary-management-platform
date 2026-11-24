@@ -1,5 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import { Role } from '../../../common/authorization/role.enum';
 import type { PrismaService } from '../../prisma/prisma.service';
 import { UsersService } from './users.service';
 
@@ -24,6 +25,8 @@ describe('UsersService', () => {
     email: 'ada@example.com',
     passwordHash: 'hashed-password',
     emailVerified: false,
+    role: Role.HR_MANAGER,
+    isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -55,6 +58,7 @@ describe('UsersService', () => {
           lastName: 'Lovelace',
           email: 'ada@example.com',
           passwordHash: 'hashed-password',
+          role: Role.HR_MANAGER,
         }),
       });
       const createData = prisma.user.create.mock.calls[0][0].data;

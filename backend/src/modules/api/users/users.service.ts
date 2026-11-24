@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import * as argon2 from 'argon2';
 
+import { Role } from '../../../common/authorization/role.enum';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -38,6 +39,8 @@ export class UsersService {
         lastName: data.lastName,
         email: data.email,
         passwordHash,
+        // Always set server-side; never taken from the request.
+        role: Role.HR_MANAGER,
         createdAt: now,
         updatedAt: now,
       },

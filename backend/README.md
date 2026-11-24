@@ -49,6 +49,26 @@ Prisma's own CLI (`npx prisma generate`, migrations, etc.) loads
 `DATABASE_URL` separately via `prisma7.config.ts` — both reads come from the
 same `.env` file, so you only maintain one copy of it.
 
+## Database migrations
+
+Apply the Prisma migrations to the database in `DATABASE_URL`, then
+regenerate the Prisma client:
+
+```bash
+# development (applies pending migrations, regenerates the client)
+$ npx prisma migrate dev --config prisma7.config.ts
+
+# production / CI (applies pending migrations only)
+$ npx prisma migrate deploy --config prisma7.config.ts
+$ npx prisma generate --config prisma7.config.ts
+```
+
+Every user has a `role` (`HR_MANAGER` or `ADMIN`) and an `is_active` flag.
+New users, and existing users when the role migration runs, are active
+`HR_MANAGER`s. Self-registration never assigns `ADMIN`. To make an `ADMIN`,
+update the user's `role` directly in the database. There is no
+admin-management API yet.
+
 ## Compile and run the project
 
 ```bash
