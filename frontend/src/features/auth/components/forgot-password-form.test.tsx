@@ -1,0 +1,59 @@
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { jsonResponse, renderWithQueryClient } from "@/test/render";
+
+import { ForgotPasswordForm } from "./forgot-password-form";
+
+const fetchMock = vi.fn<typeof fetch>();
+
+beforeEach(() => {
+  fetchMock.mockReset();
+  vi.stubGlobal("fetch", fetchMock);
+});
+
+describe("ForgotPasswordForm", () => {
+  it("validates the email before calling the API", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<ForgotPasswordForm />);
+
+    await user.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    expect(await screen.findByText("Email is required")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("shows the backend's neutral confirmation after submitting", async () => {
+    const message = "If an account exists, a password reset email has been sent.";
+    fetchMock.mockResolvedValue(jsonResponse({ message }));
+    const user = userEvent.setup();
+    renderWithQueryClient(<ForgotPasswordForm />);
+
+    await user.type(screen.getByLabelText("Email"), "hr@acme.test");
+    await user.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    expect(await screen.findByText("Check your email")).toBeInTheDocument();
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Email" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to sign in" })).toHaveAttribute("href", "/login");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://localhost:4000/api/v1/auth/forgot-password");
+    expect(JSON.parse(String(init?.body))).toEqual({ email: "hr@acme.test" });
+  });
+
+  it("shows a network error when the server is unreachable", async () => {
+    fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+    const user = userEvent.setup();
+    renderWithQueryClient(<ForgotPasswordForm />);
+
+    await user.type(screen.getByLabelText("Email"), "hr@acme.test");
+    await user.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    expect(await screen.findByText("Unable to send reset link")).toBeInTheDocument();
+    expect(
+      screen.getByText("Unable to reach the server. Check your connection and try again."),
+    ).toBeInTheDocument();
+  });
+});
