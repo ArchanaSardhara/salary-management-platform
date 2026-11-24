@@ -100,8 +100,8 @@ model Employee {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  startDate DateTime @map("start_date")
-  endDate   DateTime @map("end_date")
+  startDate DateTime  @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
 
   compensationRecords CompensationRecord[]
 
