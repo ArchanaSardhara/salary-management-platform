@@ -78,12 +78,12 @@ NestJS modules, following CLAUDE.md's backend guidelines (modules/controllers/pr
 
 | Module | Responsibility | Depends on |
 |---|---|---|
-| `AuthModule` | Credential check, session/token issuance, the guard every other module's routes use | `DatabaseModule` (to look up the HR Manager account) |
-| `EmployeesModule` | Directory search/filter/sort/pagination; single-employee profile read; create/edit employee details | `DatabaseModule`, protected by `AuthModule`'s guard |
-| `CompensationModule` | Record a salary revision; read current compensation and history; owns the overlap-validation rule | `DatabaseModule`, `AuthModule` guard |
-| `ReportingModule` | Aggregated counts and per-currency statistics by country/department, for the dashboard | `DatabaseModule`, `AuthModule` guard (read-only) |
-| `AuditModule` | Written to by `CompensationModule` inside the same transaction; no independent write entry point of its own | `DatabaseModule` |
-| `DatabaseModule` | Wraps the Prisma client as an injectable provider; the only module touching Postgres directly | — |
+| `AuthModule` | Credential check, session/token issuance, the guard every other module's routes use | `PrismaModule` (to look up the HR Manager account) |
+| `EmployeesModule` | Directory search/filter/sort/pagination; single-employee profile read; create/edit employee details | `PrismaModule`, protected by `AuthModule`'s guard |
+| `CompensationModule` | Record a salary revision; read current compensation and history; owns the overlap-validation rule | `PrismaModule`, `AuthModule` guard |
+| `ReportingModule` | Aggregated counts and per-currency statistics by country/department, for the dashboard | `PrismaModule`, `AuthModule` guard (read-only) |
+| `AuditModule` | Written to by `CompensationModule` inside the same transaction; no independent write entry point of its own | `PrismaModule` |
+| `PrismaModule` | Wraps the Prisma client as an injectable provider; the only module touching Postgres directly | — |
 | `HealthModule` | Already scaffolded; unchanged | — |
 
 `AuditModule` is modeled as a service used by `CompensationModule`, not a module with its own controller — `requirements.md` gives no requirement for standalone audit-log CRUD, only that compensation changes are attributed and recorded.

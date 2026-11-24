@@ -19,7 +19,7 @@ This followed on from earlier discovery/requirements/architecture work in
 the same session (`docs/product-discovery.md`, `docs/requirements.md`,
 `docs/feature-plan.md`, `docs/backend-architecture.md`). No business/domain
 models were in scope here — this task is pure application infrastructure,
-matching `docs/backend-architecture.md` §2's `DatabaseModule` and §5's
+matching `docs/backend-architecture.md` §2's `PrismaModule` and §5's
 cross-cutting concerns (auth/validation/transactions/error
 handling/logging), minus the not-yet-built feature modules.
 
@@ -35,9 +35,9 @@ handling/logging), minus the not-yet-built feature modules.
   `src/modules/database/database.module.ts`): `PrismaService` wraps the
   generated Prisma client using the `@prisma/adapter-pg` driver adapter,
   connects in `onModuleInit` and disconnects in `onModuleDestroy`.
-  `DatabaseModule` is `@Global()` so every future feature module can inject
+  `PrismaModule` is `@Global()` so every future feature module can inject
   `PrismaService` without importing the module individually — this matches
-  the "DatabaseModule is the only module that touches Postgres directly"
+  the "PrismaModule is the only module that touches Postgres directly"
   design already written in `docs/backend-architecture.md`.
 - **Global exception handling**
   (`src/common/filters/all-exceptions.filter.ts`): a single `@Catch()`
@@ -52,7 +52,7 @@ handling/logging), minus the not-yet-built feature modules.
   logger in `src/main.ts`): one log line per request (method, path, status,
   duration). Also never logs request/response bodies.
 - **Wiring**: `src/app.module.ts` now imports `ConfigModule`,
-  `DatabaseModule` and `HealthModule`; `src/main.ts` registers the global
+  `PrismaModule` and `HealthModule`; `src/main.ts` registers the global
   filter/interceptor and reads the validated `PORT` from `ConfigService`
   instead of raw `process.env`.
 - **Docs**: `backend/README.md` gained an "Environment variables" section;
@@ -93,7 +93,7 @@ handling/logging), minus the not-yet-built feature modules.
   validation specifically, not request-body validation, and there are no
   endpoints with a request body yet to validate. Left for when the first
   feature module with a write endpoint is built.
-- **`DatabaseModule` is `@Global()`.** Matches the architecture doc's intent
+- **`PrismaModule` is `@Global()`.** Matches the architecture doc's intent
   (every feature module depends on it) and avoids re-importing it in every
   future module.
 - **Audit/salary data never logged.** Both the exception filter and the
@@ -147,7 +147,7 @@ Actually executed, not assumed:
   not introduced here). The app itself boots correctly for this test (it
   reaches routing and returns a 404, not a config/bootstrap error),
   which incidentally confirms `ConfigModule`'s validation and
-  `DatabaseModule`'s wiring don't block startup.
+  `PrismaModule`'s wiring don't block startup.
 - `npx tsc --noEmit -p tsconfig.json`: no errors.
 
 **Not yet verified:** an actual connection to a running PostgreSQL instance
