@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
-import QueryProvider from "@/providers/QueryProvider";
+import Providers from "./providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,9 +15,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Salary Management Platform",
+  title: {
+    default: "Salary Management Platform",
+    template: "%s | Salary Management Platform",
+  },
   description:
-    "Salary Management PlatformA centralized platform for HR managers to manage employee salary information and understand how the organization pays people",
+    "A centralized platform for HR managers to manage employee salary information and understand how the organization pays people.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -26,9 +29,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        {" "}
-        <QueryProvider>{children}</QueryProvider>
+      <body className="min-h-full flex flex-col bg-background text-foreground">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
