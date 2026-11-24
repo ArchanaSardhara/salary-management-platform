@@ -83,6 +83,9 @@ export class CompensationService {
           employeeId,
           amount: dto.amount,
           currencyCode: dto.currencyCode,
+          ...(dto.payFrequency !== undefined && { payFrequency: dto.payFrequency }),
+          ...(dto.type !== undefined && { type: dto.type }),
+          changeReason: dto.changeReason ?? null,
           effectiveFrom,
           effectiveTo,
         },
@@ -91,7 +94,7 @@ export class CompensationService {
       await tx.auditLog.create({
         data: {
           compensationRecordId: record.id,
-          changedBy,
+          changedById: changedBy,
           beforeValue: previous
             ? (toCompensationSnapshot(previous) as unknown as Prisma.InputJsonValue)
             : Prisma.JsonNull,

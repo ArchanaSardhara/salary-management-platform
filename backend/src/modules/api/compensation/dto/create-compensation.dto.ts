@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsDateString,
+  IsEnum,
   IsIn,
   IsNumber,
   IsOptional,
@@ -8,6 +9,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { CompensationType, PayFrequency } from '../../../../generated/prisma/client';
 import {
   AMOUNT_MAX,
   AMOUNT_MIN,
@@ -41,4 +43,19 @@ export class CreateCompensationDto {
   @IsOptional()
   @IsDateString()
   effectiveTo?: string | null;
+
+  /** Defaults to MONTHLY when omitted. */
+  @IsOptional()
+  @IsEnum(PayFrequency)
+  payFrequency?: PayFrequency;
+
+  /** Defaults to BASE_SALARY when omitted. */
+  @IsOptional()
+  @IsEnum(CompensationType)
+  type?: CompensationType;
+
+  /** Human-readable reason for the change (e.g. "Annual review 2026"). */
+  @IsOptional()
+  @IsString()
+  changeReason?: string | null;
 }

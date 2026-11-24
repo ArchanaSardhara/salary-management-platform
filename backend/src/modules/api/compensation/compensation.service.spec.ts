@@ -63,6 +63,9 @@ describe('CompensationService', () => {
     employeeId: 'emp-1',
     amount: new Prisma.Decimal('5000.00'),
     currencyCode: 'USD',
+    payFrequency: 'MONTHLY' as const,
+    type: 'BASE_SALARY' as const,
+    changeReason: null,
     effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
     effectiveTo: null,
     createdAt: now,
@@ -97,6 +100,7 @@ describe('CompensationService', () => {
           employeeId: 'emp-1',
           amount: 5000,
           currencyCode: 'USD',
+          changeReason: null,
           effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
           effectiveTo: null,
         },
@@ -104,7 +108,7 @@ describe('CompensationService', () => {
       expect(auditLogModel.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           compensationRecordId: 'rec-1',
-          changedBy: 'user-1',
+          changedById: 'user-1',
           beforeValue: Prisma.JsonNull,
         }),
       });
@@ -256,7 +260,7 @@ describe('CompensationService', () => {
       const auditLog = {
         id: 'audit-1',
         compensationRecordId: 'rec-1',
-        changedBy: 'user-1',
+        changedById: 'user-1',
         changedAt: now,
         beforeValue: null,
         afterValue: { amount: '5000.00', currencyCode: 'USD', effectiveFrom: '2026-01-01', effectiveTo: null },
@@ -266,7 +270,7 @@ describe('CompensationService', () => {
 
       const result = await service.findAuditLog('emp-1', 'rec-1');
 
-      expect(result.changedBy).toBe('user-1');
+      expect(result.changedById).toBe('user-1');
       expect(result.beforeValue).toBeNull();
     });
 

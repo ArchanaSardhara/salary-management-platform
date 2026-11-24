@@ -5,6 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
+
+function parseDate(dateStr: string): Date {
+  return new Date(`${dateStr.split('T')[0]}T00:00:00.000Z`);
+}
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import {
@@ -50,6 +54,8 @@ export class EmployeesService {
           countryCode: dto.countryCode,
           department: dto.department,
           jobTitle: dto.jobTitle,
+          startDate: parseDate(dto.startDate),
+          endDate: dto.endDate ? parseDate(dto.endDate) : null,
         },
       });
       return toEmployeeResponse(employee);
@@ -98,10 +104,17 @@ export class EmployeesService {
   }
 
   async update(id: string, dto: UpdateEmployeeDto): Promise<EmployeeResponse> {
-    const { version, ...changes } = dto;
-    const data = Object.fromEntries(
-      Object.entries(changes).filter(([, value]) => value !== undefined),
-    ) as Omit<UpdateEmployeeDto, 'version'>;
+    const { version, startDate, endDate, ...rest } = dto;
+    const dateFields: { startDate?: Date; endDate?: Date | null } = {};
+    if (startDate !== undefined) dateFields.startDate = parseDate(startDate);
+    if (endDate !== undefined) dateFields.endDate = endDate ? parseDate(endDate) : null;
+
+    const data = {
+      ...Object.fromEntries(
+        Object.entries(rest).filter(([, value]) => value !== undefined),
+      ),
+      ...dateFields,
+    } as Omit<UpdateEmployeeDto, 'version' | 'startDate' | 'endDate'>;
 
     if (Object.keys(data).length === 0) {
       throw new BadRequestException(EMPLOYEE_MESSAGES.noChanges);

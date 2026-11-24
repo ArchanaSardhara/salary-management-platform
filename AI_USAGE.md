@@ -787,3 +787,54 @@ Actually executed in `backend/`:
 - Migration not yet applied to Neon.
 
 [human note: ]
+
+---
+
+## 9. Schema improvements: startDate/endDate on Employee, payFrequency/type/changeReason on CompensationRecord, changedById FK on AuditLog
+
+**What was asked:** Review the last commit's schema changes and update all application code to match new types and fields.
+
+**Schema changes applied by developer (committed in 455e60b):**
+- `Employee`: added `startDate DateTime @db.Date` (required), `endDate DateTime? @db.Date` (nullable — fixed from non-nullable during this task), `createdAt @default(now())` added to `User`
+- `CompensationRecord`: added `payFrequency PayFrequency @default(MONTHLY)`, `type CompensationType @default(BASE_SALARY)`, `changeReason String?`
+- `AuditLog`: renamed `changedBy String` → `changedById String?` as a nullable FK to `User`
+- New enums: `CompensationType`, `PayFrequency`
+
+**What AI generated:**
+- Schema fix: changed `endDate DateTime` → `endDate DateTime?` (non-nullable end date is semantically wrong for active employees)
+- Prisma client regenerated
+- `employee-fields.ts`: added `StartDateField`, `EndDateField` decorators
+- `create-employee.dto.ts`: added required `startDate`, optional `endDate`
+- `update-employee.dto.ts`: added optional `startDate`, `endDate`
+- `employee-response.dto.ts`: added `startDate`/`endDate` to `EmployeeResponse`, added `formatDate` helper
+- `employees.service.ts`: added `parseDate` helper, maps `startDate`/`endDate` in `create`; extracts and converts date fields before the generic `Object.fromEntries` spread in `update`
+- `create-compensation.dto.ts`: added optional `payFrequency`, `type`, `changeReason` with `@IsEnum`/`@IsString` validators
+- `compensation-response.dto.ts`: added `payFrequency`, `type`, `changeReason` to `CompensationResponse` and `CompensationSnapshot`; renamed `changedBy` → `changedById` in `AuditLogResponse` and `toAuditLogResponse`
+- `compensation.service.ts`: renamed `changedBy` → `changedById` in audit log create; passes `changeReason`, conditionally spreads `payFrequency`/`type` when provided
+
+**Files changed:**
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/api/employees/dto/employee-fields.ts`
+- `backend/src/modules/api/employees/dto/create-employee.dto.ts`
+- `backend/src/modules/api/employees/dto/update-employee.dto.ts`
+- `backend/src/modules/api/employees/dto/employee-response.dto.ts`
+- `backend/src/modules/api/employees/employees.service.ts`
+- `backend/src/modules/api/compensation/dto/create-compensation.dto.ts`
+- `backend/src/modules/api/compensation/dto/compensation-response.dto.ts`
+- `backend/src/modules/api/compensation/compensation.service.ts`
+- `backend/src/modules/api/employees/employees.service.spec.ts`
+- `backend/src/modules/api/employees/employees.controller.spec.ts`
+- `backend/src/modules/api/compensation/compensation.service.spec.ts`
+- `backend/src/modules/api/compensation/compensation.controller.spec.ts`
+
+**Technical decisions:**
+- `endDate` made nullable (`DateTime?`) in schema — requiring a termination date at creation time would prevent creating active employees
+- `startDate`/`endDate` stored as `@db.Date` for consistency with compensation effective dates; parsed to midnight UTC in service
+- `payFrequency`/`type` have Prisma-level defaults so they're optional in the DTO; only spread into the create call when explicitly provided
+- `changedById` uses `?? null` fallback in `toAuditLogResponse` to handle rows where the referenced User was deleted
+
+**Tests:** `npm test` — **23/23 suites, 263/263 tests pass.** `tsc --noEmit` — clean.
+
+**Outstanding:** Schema migration for `employees` table changes (`startDate`, `endDate`) has not been generated or applied to Neon.
+
+[human note: ]

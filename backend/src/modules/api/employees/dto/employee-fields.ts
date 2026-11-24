@@ -1,6 +1,7 @@
 import { applyDecorators } from '@nestjs/common';
 import { Transform } from 'class-transformer';
 import {
+  IsDateString,
   IsEmail,
   IsIn,
   IsISO31661Alpha2,
@@ -96,4 +97,18 @@ export const JobTitleField = (partial = false) =>
     IsIn(JOB_TITLES, {
       message: `jobTitle must be one of: ${JOB_TITLES.join(', ')}`,
     }),
+  );
+
+/** Required hire date in YYYY-MM-DD format. */
+export const StartDateField = (partial = false) =>
+  applyDecorators(
+    ...required(partial),
+    IsDateString({}, { message: 'startDate must be a valid date string (YYYY-MM-DD)' }),
+  );
+
+/** Optional termination date in YYYY-MM-DD format; null clears the field. */
+export const EndDateField = () =>
+  applyDecorators(
+    IsOptional(),
+    IsDateString({}, { message: 'endDate must be a valid date string (YYYY-MM-DD)' }),
   );

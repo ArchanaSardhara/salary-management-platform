@@ -41,6 +41,8 @@ describe('EmployeesService', () => {
     countryCode: 'IN',
     department: 'Engineering',
     jobTitle: 'Software Engineer',
+    startDate: new Date('2026-01-15T00:00:00.000Z'),
+    endDate: null,
     version: 1,
     createdAt: now,
     updatedAt: now,
@@ -55,6 +57,7 @@ describe('EmployeesService', () => {
     countryCode: 'IN',
     department: 'Engineering',
     jobTitle: 'Software Engineer',
+    startDate: '2026-01-15',
   };
 
   const uniqueEmailError = new Prisma.PrismaClientKnownRequestError(
@@ -73,7 +76,18 @@ describe('EmployeesService', () => {
 
       const result = await service.create(createDto);
 
-      expect(employeeModel.create).toHaveBeenCalledWith({ data: createDto });
+      expect(employeeModel.create).toHaveBeenCalledWith({
+        data: {
+          firstName: createDto.firstName,
+          lastName: createDto.lastName ?? null,
+          email: createDto.email ?? null,
+          countryCode: createDto.countryCode,
+          department: createDto.department,
+          jobTitle: createDto.jobTitle,
+          startDate: new Date('2026-01-15T00:00:00.000Z'),
+          endDate: null,
+        },
+      });
       expect(result).toMatchObject({
         id: 'emp-1',
         employeeCode: 'EMP-000042',
@@ -90,7 +104,7 @@ describe('EmployeesService', () => {
       await service.create(withoutEmail);
 
       expect(employeeModel.create).toHaveBeenCalledWith({
-        data: { ...withoutEmail, email: null },
+        data: expect.objectContaining({ email: null, startDate: new Date('2026-01-15T00:00:00.000Z') }),
       });
     });
 
@@ -101,7 +115,7 @@ describe('EmployeesService', () => {
       const result = await service.create(withoutLastName);
 
       expect(employeeModel.create).toHaveBeenCalledWith({
-        data: { ...withoutLastName, lastName: null },
+        data: expect.objectContaining({ lastName: null, startDate: new Date('2026-01-15T00:00:00.000Z') }),
       });
       expect(result).toMatchObject({ firstName: 'Priya', lastName: null });
     });

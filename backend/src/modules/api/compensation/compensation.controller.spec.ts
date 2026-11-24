@@ -223,7 +223,7 @@ describe('CompensationController (HTTP)', () => {
       const auditEntry = {
         id: 'audit-1',
         compensationRecordId: RID,
-        changedBy: 'u-hr',
+        changedById: 'u-hr',
         changedAt: new Date(),
         beforeValue: null,
         afterValue: { amount: '5000.00', currencyCode: 'USD', effectiveFrom: '2026-01-01', effectiveTo: null },
@@ -234,7 +234,7 @@ describe('CompensationController (HTTP)', () => {
         .get(`/employees/${EID}/compensation/${RID}/audit`)
         .expect(200);
 
-      expect(res.body.changedBy).toBe('u-hr');
+      expect(res.body.changedById).toBe('u-hr');
       expect(service.findAuditLog).toHaveBeenCalledWith(EID, RID);
     });
   });

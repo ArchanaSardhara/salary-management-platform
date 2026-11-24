@@ -12,6 +12,8 @@ export interface EmployeeResponse {
   countryCode: string;
   department: string;
   jobTitle: string;
+  startDate: string;
+  endDate: string | null;
   status: EmployeeStatus;
   version: number;
   createdAt: Date;
@@ -29,6 +31,10 @@ export interface PaginatedEmployeesResponse {
   };
 }
 
+function formatDate(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
 export function toEmployeeResponse(employee: Employee): EmployeeResponse {
   return {
     id: employee.id,
@@ -39,6 +45,8 @@ export function toEmployeeResponse(employee: Employee): EmployeeResponse {
     countryCode: employee.countryCode,
     department: employee.department,
     jobTitle: employee.jobTitle,
+    startDate: formatDate(employee.startDate),
+    endDate: employee.endDate ? formatDate(employee.endDate) : null,
     status: employee.deletedAt ? 'DELETED' : 'ACTIVE',
     version: employee.version,
     createdAt: employee.createdAt,

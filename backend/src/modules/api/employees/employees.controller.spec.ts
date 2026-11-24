@@ -47,6 +47,7 @@ describe('EmployeesController (HTTP)', () => {
     countryCode: 'IN',
     department: 'Engineering',
     jobTitle: 'Software Engineer',
+    startDate: '2026-01-15',
   };
   const employee = { id: 'emp-1', employeeCode: 'EMP-000001', ...validBody };
 

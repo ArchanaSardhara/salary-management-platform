@@ -4,9 +4,11 @@ import {
   CountryCodeField,
   DepartmentField,
   EmailField,
+  EndDateField,
   FirstNameField,
   JobTitleField,
   LastNameField,
+  StartDateField,
 } from './employee-fields';
 
 /**
@@ -37,4 +39,10 @@ export class UpdateEmployeeDto {
 
   @JobTitleField(true)
   jobTitle?: JobTitle;
+
+  @StartDateField(true)
+  startDate?: string;
+
+  @EndDateField()
+  endDate?: string | null;
 }
