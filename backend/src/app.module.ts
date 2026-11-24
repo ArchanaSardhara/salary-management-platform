@@ -4,7 +4,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validateEnv } from './config/env.validation';
 import { HealthModule } from './modules/api/health/health.module';
-import { DatabaseModule } from './modules/database/database.module';
+import { PrismaModule } from './modules/prisma/prisma.module';
+// import { PrismaModule } from './modules/prisma/prisma.module';
+import { AuthModule } from './modules/api/auth/auth.module';
+import { UsersModule } from './modules/api/users/users.module';
 
 @Module({
   imports: [
@@ -12,8 +15,10 @@ import { DatabaseModule } from './modules/database/database.module';
       isGlobal: true,
       validate: validateEnv,
     }),
-    DatabaseModule,
+    PrismaModule,
     HealthModule,
+    AuthModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

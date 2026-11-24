@@ -9,7 +9,10 @@ export function validateEnv(config: Record<string, unknown>): EnvConfig {
 
   if (!result.success) {
     const issues = result.error.issues
-      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .map(
+        (issue: { path: any[]; message: any }) =>
+          `${issue.path.join('.') || '(root)'}: ${issue.message}`,
+      )
       .join('; ');
     throw new Error(`Invalid environment configuration — ${issues}`);
   }
