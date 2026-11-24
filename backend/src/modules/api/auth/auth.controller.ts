@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Post,
   Req,
   Res,
@@ -44,6 +46,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @HttpCode(HttpStatus.OK)
   async register(
     @Body() dto: RegisterDto,
     @Res({ passthrough: true }) res: Response,
@@ -55,10 +58,14 @@ export class AuthController {
       refresh_token: data.refreshToken,
     });
 
-    return res.status(200).json({ success: true });
+    return {
+      success: true,
+      message: 'Registration successful',
+    };
   }
 
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -70,7 +77,10 @@ export class AuthController {
       refresh_token: data.refreshToken,
     });
 
-    return res.status(200).json({ success: true });
+    return {
+      success: true,
+      message: 'Login successful',
+    };
   }
 
   @Get('verify')
