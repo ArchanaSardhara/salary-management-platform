@@ -31,8 +31,8 @@ handling/logging), minus the not-yet-built feature modules.
   process fails fast at startup with a readable error if a variable is
   missing or malformed, instead of failing later with a confusing runtime
   error.
-- **Prisma / PostgreSQL** (`src/modules/database/prisma.service.ts`,
-  `src/modules/database/database.module.ts`): `PrismaService` wraps the
+- **Prisma / PostgreSQL** (`src/modules/prisma/prisma.service.ts`,
+  `src/modules/prisma/prisma.module.ts`): `PrismaService` wraps the
   generated Prisma client using the `@prisma/adapter-pg` driver adapter,
   connects in `onModuleInit` and disconnects in `onModuleDestroy`.
   `PrismaModule` is `@Global()` so every future feature module can inject
@@ -63,9 +63,9 @@ handling/logging), minus the not-yet-built feature modules.
 - `backend/src/config/env.schema.ts` (new)
 - `backend/src/config/env.validation.ts` (new)
 - `backend/src/config/env.validation.spec.ts` (new)
-- `backend/src/modules/database/prisma.service.ts` (new)
-- `backend/src/modules/database/prisma.service.spec.ts` (new)
-- `backend/src/modules/database/database.module.ts` (new)
+- `backend/src/modules/prisma/prisma.service.ts` (new)
+- `backend/src/modules/prisma/prisma.service.spec.ts` (new)
+- `backend/src/modules/prisma/prisma.module.ts` (new)
 - `backend/src/common/filters/all-exceptions.filter.ts` (new)
 - `backend/src/common/filters/all-exceptions.filter.spec.ts` (new)
 - `backend/src/common/interceptors/logging.interceptor.ts` (new)
@@ -136,7 +136,7 @@ Actually executed, not assumed:
   (`env.validation.spec.ts`, `all-exceptions.filter.spec.ts`,
   `logging.interceptor.spec.ts`, `prisma.service.spec.ts`). The
   `prisma.service.spec.ts` tests mock `$connect`/`$disconnect` so they stay
-  fast and deterministic and need no real database.
+  fast and deterministic and need no real prisma.
   **2 pre-existing failures**, confirmed unrelated to this task (see
   above): `app.controller.spec.ts` (empty test suite) and
   `health.controller.spec.ts` (missing `HealthCheckService` provider in its
