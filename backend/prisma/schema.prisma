@@ -31,11 +31,12 @@ model User {
   role     Role    @default(HR_MANAGER)
   isActive Boolean @default(true) @map("is_active")
 
-  createdAt DateTime @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @map("updated_at")
 
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  auditLogs           AuditLog[]
 
   @@map("users")
 }
@@ -99,6 +100,9 @@ model Employee {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+
   compensationRecords CompensationRecord[]
 
   @@index([deletedAt])
@@ -106,6 +110,22 @@ model Employee {
   @@index([department])
   @@index([jobTitle])
   @@map("employees")
+}
+
+enum CompensationType {
+  BASE_SALARY
+  BONUS
+  COMMISSION
+  EQUITY_GRANT
+  ALLOWANCE
+}
+
+enum PayFrequency {
+  MONTHLY
+  SEMI_MONTHLY
+  BI_WEEKLY
+  WEEKLY
+  ANNUAL
 }
 
 /// A single monthly salary record for an employee. Records are append-only;
@@ -119,13 +139,17 @@ model CompensationRecord {
   employee   Employee @relation(fields: [employeeId], references: [id])
 
   /// Monthly gross salary amount; stored as an exact decimal, never float.
-  amount       Decimal  @db.Decimal(14, 2)
+  amount       Decimal          @db.Decimal(14, 2)
   /// ISO 4217 currency code, validated against the list in
   /// src/common/constants/currency-codes.ts.
-  currencyCode String   @map("currency_code") @db.Char(3)
-  effectiveFrom DateTime @map("effective_from") @db.Date
+  currencyCode String           @map("currency_code") @db.Char(3)
+  payFrequency PayFrequency     @default(MONTHLY) @map("pay_frequency")
+  type         CompensationType @default(BASE_SALARY)
+
+  changeReason  String?   @map("change_reason")
+  effectiveFrom DateTime  @map("effective_from") @db.Date
   /// null means this record is currently active (no end date yet).
-  effectiveTo  DateTime? @map("effective_to") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -146,8 +170,9 @@ model AuditLog {
   compensationRecord   CompensationRecord @relation(fields: [compensationRecordId], references: [id])
 
   /// ID of the User who recorded the salary change.
-  changedBy String   @map("changed_by")
-  changedAt DateTime @default(now()) @map("changed_at")
+  changedById String?  @map("changed_by_id")
+  changedBy   User?    @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  changedAt   DateTime @default(now()) @map("changed_at")
 
   /// Snapshot of the employee's previous compensation; null for the first
   /// compensation record.
@@ -155,5 +180,6 @@ model AuditLog {
   /// Snapshot of the newly created compensation record.
   afterValue  Json  @map("after_value") @db.JsonB
 
+  @@index([changedById])
   @@map("audit_logs")
 }
