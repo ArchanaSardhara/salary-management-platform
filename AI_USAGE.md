@@ -536,3 +536,166 @@ Actually executed in `backend/`:
 [human note: Integrated RBAC into the authentication flow with HR_MANAGER and ADMIN roles. Added secure handling for deactivated users across login, verify, refresh, and password reset flows. Updated tests and documentation.
 
 Verification: All tests passed, TypeScript compilation passed. Database migration is generated.]
+
+---
+
+## 6. Employee management: create, read, update, soft delete, restore
+
+### What was asked
+
+"create Employee Management with Create, read, update, soft delete,
+restore".
+
+### Developer decisions (answered before implementation)
+
+The docs left these open or contradicted each other, so they were asked, not
+assumed:
+
+- **Employee code:** server-generated (`EMP-000042` from a database
+  sequence), immutable, never accepted from clients.
+- **Department and job title:** fixed lists in code. The developer approved
+  the proposed lists: 10 departments and 16 job titles, not tied to each
+  other. This differs from Q5 ("free text") in `product-discovery.md`, which
+  was not edited.
+- **Status:** only deleted or not — a nullable `deletedAt`; responses show
+  `ACTIVE` / `DELETED`; lists hide deleted employees by default.
+- **Salary and currency:** not part of the employee; they belong to the
+  later compensation feature.
+
+Taken from existing decisions: soft delete keeps the employee's records (the
+SRS-review note in `product-discovery.md` supersedes the original hard
+delete); stale saves are rejected (Q10 / BR9); country is an ISO code
+(§7.2); every endpoint is `HR_MANAGER` only (RBAC, entry 4).
+
+### What AI generated
+
+- `prisma/schema.prisma` — `Employee` model (`employees` table): `id`,
+  `employeeNumber` (autoincrement, unique), `fullName`, `email` (optional,
+  unique), `countryCode` (`CHAR(2)`), `department`, `jobTitle`, `version`,
+  `createdAt`, `updatedAt`, `deletedAt`; indexes on `deletedAt`,
+  `countryCode`, `department`, `jobTitle`.
+- `prisma/migrations/20261124140000_add_employees/migration.sql` —
+  generated with `prisma migrate diff` (committed schema → new schema).
+- `src/modules/api/employees/`:
+  - `employee.constants.ts` — department and job-title lists, limits,
+    `formatEmployeeCode`.
+  - `dto/employee-fields.ts` — shared field validators (trim; lowercase
+    email; uppercase country; ISO 3166-1 alpha-2; `IsIn` the lists) used by
+    both create and update, so the rules live in one place.
+  - `dto/create-employee.dto.ts`, `dto/update-employee.dto.ts` (partial
+    update, `version` required, only `email` may be `null`),
+    `dto/list-employees-query.dto.ts` (`page`, `pageSize` ≤ 100, `status`
+    = active | deleted | all), `dto/employee-response.dto.ts`.
+  - `employees.service.ts`, `employees.controller.ts`,
+    `employees.module.ts`; registered in `app.module.ts`.
+- Endpoints (all `JwtAuthGuard` + `RolesGuard` + `@Roles(HR_MANAGER)`):
+  `POST /employees` (201), `GET /employees` (paginated
+  `{ data, meta }`), `GET /employees/:id` (includes deleted, with
+  status), `PATCH /employees/:id`, `DELETE /employees/:id` (soft delete,
+  200), `POST /employees/:id/restore` (200).
+- Tests: `employees.service.spec.ts` (unit) and
+  `employees.controller.spec.ts` (Supertest: 401/403 on every route for
+  unauthenticated, ADMIN and deactivated users; 400 validation cases;
+  input normalisation; query conversion).
+- Docs: `docs/backend-architecture.md` §3 and §6 updated.
+
+### Technical decisions
+
+- **Concurrency:** update is a single
+  `updateMany where { id, version, deletedAt: null }` with
+  `version: { increment: 1 }`, run in a transaction. If no row matches, the
+  service looks the employee up to tell the cases apart: 404 (not found),
+  409 "deleted; restore it before editing", or 409 "changed by someone
+  else". Soft delete and restore also bump `version`, so an edit based on a
+  copy read before them is rejected.
+- **Errors:** delete of an already-deleted employee and restore of an
+  active one return 409; unknown id returns 404. A duplicate email
+  (Prisma `P2002`) maps to 409 instead of falling through to 500.
+- **Email** is unique across all employees, including soft-deleted ones,
+  so restoring an employee can never hit a duplicate email.
+- **List** is ordered by `employeeNumber` (unique), so pagination is stable.
+  Search, filters and sorting are left to the employee-directory feature.
+- Department and job title are stored as strings and validated in code (not
+  Prisma enums), so a list change needs no migration.
+
+### Test and verification results
+
+Actually executed in `backend/`:
+
+- `npx prisma validate`: schema valid. `npx prisma generate`: succeeded.
+- `npx tsc --noEmit -p tsconfig.json`: no errors. The first run flagged an
+  implicit-`any` self-reference in the service spec's Prisma mock; it was
+  fixed by typing the mock. `npm test` had passed even with that error, so
+  Jest's run does not fully type-check specs.
+- `npm test`: **20/20 suites, 202/202 tests pass.**
+- `npx oxlint src/modules/api/employees src/app.module.ts`: no findings.
+- `npm run lint` (type-aware): **did not run** — the same `tsgolint.exe`
+  start-up failure as before.
+- The migration was **not applied** to the database. It must be applied
+  before the endpoints work against a real database.
+- No manual end-to-end run against a real database.
+
+### Outstanding issues / known gaps
+
+- Apply `20261124140000_add_employees` (`npx prisma migrate deploy
+  --config prisma7.config.ts`).
+- Search (code/name/email), filters (country/department/job title) and
+  sorting are not implemented — that is the employee-directory feature.
+- No audit trail for employee create/update/delete; `requirements.md` only
+  requires auditing compensation changes.
+- `requirements.md` / `product-discovery.md` still describe free-text job
+  titles and departments; the developer needs to update them.
+
+[human note: ]
+
+---
+
+## 7. Split employee full name into first and last name
+
+### What was asked
+
+"update full name to first name and last name columns" — for the Employee
+model from entry 6.
+
+### What AI generated
+
+- `prisma/schema.prisma` — `fullName` (`full_name`) replaced by `firstName`
+  (`first_name`, required) and `lastName` (`last_name`, optional).
+- `prisma/migrations/20261124140000_add_employees/migration.sql` —
+  **regenerated in place** rather than adding a new migration, because it
+  had been neither applied (`migrate status` listed it as pending) nor
+  committed. Regenerated with `prisma migrate diff` against the committed
+  schema.
+- `employee.constants.ts` — `FULL_NAME_MAX_LENGTH = 200` replaced by
+  `NAME_MAX_LENGTH = 100` (same limit as `UserDto`).
+- `dto/employee-fields.ts` — `FullNameField` replaced by `FirstNameField`
+  (trimmed, non-empty, ≤ 100; cannot be null on update) and `LastNameField`
+  (optional, nullable, trimmed, ≤ 100; a blank value becomes `null`).
+- `create-employee.dto.ts`, `update-employee.dto.ts`,
+  `employee-response.dto.ts`, `employees.service.ts` — use
+  `firstName` / `lastName`. `lastName: null` on update clears it.
+- Tests updated, and new cases added: missing last name accepted, blank last
+  name stored as null, last name too long or not a string → 400, the old
+  `fullName` field → 400, `firstName: null` on update → 400, clearing the
+  last name with `null`.
+- `docs/backend-architecture.md` — data-model diagram uses
+  `firstName` / `lastName`.
+
+### Assumptions (AI, stated to the developer)
+
+- `lastName` is optional, so single-name employees can be recorded, and
+  both names allow 100 characters. This mirrors the existing `User` model;
+  the developer did not specify either.
+
+### Test and verification results
+
+Actually executed in `backend/`:
+
+- `npx prisma validate`: valid. `npx prisma generate`: succeeded.
+- `npx tsc --noEmit -p tsconfig.json`: no errors.
+- `npm test`: **20/20 suites, 209/209 tests pass.**
+- `npx oxlint src/modules/api/employees`: no findings.
+- `npm run lint` (type-aware): not run — same `tsgolint.exe` failure.
+- Migration still **not applied** to the database.
+
+[human note: Implemented Employee Management with create, read, update, soft delete, and restore functionality. Added server-generated employee codes, validation, pagination, role-based access, and optimistic concurrency handling.]
