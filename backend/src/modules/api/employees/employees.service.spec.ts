@@ -159,7 +159,7 @@ describe('EmployeesService', () => {
 
       expect(employeeModel.findMany).toHaveBeenCalledWith({
         where: { deletedAt: null },
-        orderBy: { employeeNumber: 'asc' },
+        orderBy: [{ employeeNumber: 'asc' }],
         skip: 40,
         take: 20,
       });

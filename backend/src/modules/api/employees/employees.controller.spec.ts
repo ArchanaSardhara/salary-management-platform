@@ -79,20 +79,37 @@ describe('EmployeesController (HTTP)', () => {
 
   describe('access control', () => {
     const routes: Array<[string, () => request.Test]> = [
-      ['POST /employees', () => http().post('/employees').send(validBody)],
-      ['GET /employees', () => http().get('/employees')],
-      ['GET /employees/:id', () => http().get('/employees/emp-1')],
+      ['POST /employees', () => http().post('/api/v1/employees').send(validBody)],
+      ['GET /employees', () => http().get('/api/v1/employees')],
+      ['GET /employees/:id', () => http().get('/api/v1/employees/emp-1')],
       [
         'PATCH /employees/:id',
         () =>
           http()
-            .patch('/employees/emp-1')
+            .patch('/api/v1/employees/emp-1')
             .send({ version: 1, firstName: 'X' }),
       ],
-      ['DELETE /employees/:id', () => http().delete('/employees/emp-1')],
+      ['DELETE /employees/:id', () => http().delete('/api/v1/employees/emp-1')],
       [
         'POST /employees/:id/restore',
-        () => http().post('/employees/emp-1/restore'),
+        () => http().post('/api/v1/employees/emp-1/restore'),
+      ],
+    ];
+
+    // Write routes are restricted to HR_MANAGER; ADMIN may only read.
+    const hrOnlyRoutes: Array<[string, () => request.Test]> = [
+      ['POST /employees', () => http().post('/api/v1/employees').send(validBody)],
+      [
+        'PATCH /employees/:id',
+        () =>
+          http()
+            .patch('/api/v1/employees/emp-1')
+            .send({ version: 1, firstName: 'X' }),
+      ],
+      ['DELETE /employees/:id', () => http().delete('/api/v1/employees/emp-1')],
+      [
+        'POST /employees/:id/restore',
+        () => http().post('/api/v1/employees/emp-1/restore'),
       ],
     ];
 
@@ -102,7 +119,7 @@ describe('EmployeesController (HTTP)', () => {
       await send().expect(401);
     });
 
-    it.each(routes)('%s returns 403 for ADMIN', async (_r, send) => {
+    it.each(hrOnlyRoutes)('%s returns 403 for ADMIN', async (_r, send) => {
       currentUser = { id: 'u-admin', role: Role.ADMIN, isActive: true };
 
       await send().expect(403);
@@ -120,8 +137,8 @@ describe('EmployeesController (HTTP)', () => {
     it('never reaches the service when access is denied', async () => {
       currentUser = { id: 'u-admin', role: Role.ADMIN, isActive: true };
 
-      await http().get('/employees').expect(403);
-      expect(service.findAll).not.toHaveBeenCalled();
+      await http().post('/api/v1/employees').send(validBody).expect(403);
+      expect(service.create).not.toHaveBeenCalled();
     });
   });
 
@@ -129,7 +146,7 @@ describe('EmployeesController (HTTP)', () => {
     it('creates an employee and returns 201', async () => {
       service.create.mockResolvedValue(employee);
 
-      const res = await http().post('/employees').send(validBody).expect(201);
+      const res = await http().post('/api/v1/employees').send(validBody).expect(201);
 
       expect(res.body).toEqual(employee);
       expect(service.create).toHaveBeenCalledWith(validBody);
@@ -139,7 +156,7 @@ describe('EmployeesController (HTTP)', () => {
       service.create.mockResolvedValue(employee);
 
       await http()
-        .post('/employees')
+        .post('/api/v1/employees')
         .send({
           ...validBody,
           firstName: '  Priya  ',
@@ -156,14 +173,14 @@ describe('EmployeesController (HTTP)', () => {
       service.create.mockResolvedValue(employee);
       const { email: _omit, ...withoutEmail } = validBody;
 
-      await http().post('/employees').send(withoutEmail).expect(201);
+      await http().post('/api/v1/employees').send(withoutEmail).expect(201);
     });
 
     it('accepts a missing last name (single-name employees)', async () => {
       service.create.mockResolvedValue(employee);
       const { lastName: _omit, ...withoutLastName } = validBody;
 
-      await http().post('/employees').send(withoutLastName).expect(201);
+      await http().post('/api/v1/employees').send(withoutLastName).expect(201);
 
       expect(service.create).toHaveBeenCalledWith(withoutLastName);
     });
@@ -172,7 +189,7 @@ describe('EmployeesController (HTTP)', () => {
       service.create.mockResolvedValue(employee);
 
       await http()
-        .post('/employees')
+        .post('/api/v1/employees')
         .send({ ...validBody, lastName: '   ' })
         .expect(201);
 
@@ -197,7 +214,7 @@ describe('EmployeesController (HTTP)', () => {
       ['client-supplied employeeCode', { employeeCode: 'EMP-999999' }],
     ])('returns 400 for %s', async (_label, override) => {
       await http()
-        .post('/employees')
+        .post('/api/v1/employees')
         .send({ ...validBody, ...override })
         .expect(400);
 
@@ -209,7 +226,7 @@ describe('EmployeesController (HTTP)', () => {
     it('applies default pagination and status', async () => {
       service.findAll.mockResolvedValue({ data: [], meta: {} });
 
-      await http().get('/employees').expect(200);
+      await http().get('/api/v1/employees').expect(200);
 
       expect(service.findAll).toHaveBeenCalledWith({
         page: 1,
@@ -222,7 +239,7 @@ describe('EmployeesController (HTTP)', () => {
       service.findAll.mockResolvedValue({ data: [], meta: {} });
 
       await http()
-        .get('/employees')
+        .get('/api/v1/employees')
         .query({ page: '2', pageSize: '50', status: 'deleted' })
         .expect(200);
 
@@ -244,7 +261,7 @@ describe('EmployeesController (HTTP)', () => {
       ['one unknown status among valid ones', 'status=active&status=archived'],
       ['search over 100 characters', { search: 'a'.repeat(101) }],
     ])('returns 400 for %s', async (_label, query) => {
-      await http().get('/employees').query(query).expect(400);
+      await http().get('/api/v1/employees').query(query).expect(400);
       expect(service.findAll).not.toHaveBeenCalled();
     });
 
@@ -252,7 +269,7 @@ describe('EmployeesController (HTTP)', () => {
       service.findAll.mockResolvedValue({ data: [], meta: {} });
 
       await http()
-        .get('/employees')
+        .get('/api/v1/employees')
         .query({ search: '  priya ', countryCode: 'in', department: 'Engineering' })
         .expect(200);
 
@@ -269,7 +286,7 @@ describe('EmployeesController (HTTP)', () => {
       service.findAll.mockResolvedValue({ data: [], meta: {} });
 
       await http()
-        .get('/employees')
+        .get('/api/v1/employees')
         .query({ search: '   ', countryCode: '', department: '' })
         .expect(200);
 
@@ -286,7 +303,7 @@ describe('EmployeesController (HTTP)', () => {
 
       await http()
         .get(
-          '/employees?countryCode=in&countryCode=US&countryCode=IN' +
+          '/api/v1/employees?countryCode=in&countryCode=US&countryCode=IN' +
             '&department=Engineering&department=Finance' +
             '&status=active&status=deleted',
         )
@@ -305,7 +322,7 @@ describe('EmployeesController (HTTP)', () => {
       service.findAll.mockResolvedValue({ data: [], meta: {} });
 
       await http()
-        .get('/employees?department=&department=Finance')
+        .get('/api/v1/employees?department=&department=Finance')
         .expect(200);
 
       expect(service.findAll).toHaveBeenCalledWith(
@@ -324,7 +341,7 @@ describe('EmployeesController (HTTP)', () => {
       };
       service.getOptions.mockResolvedValue(options);
 
-      const res = await http().get('/employees/options').expect(200);
+      const res = await http().get('/api/v1/employees/options').expect(200);
 
       expect(res.body).toEqual(options);
       expect(service.findOne).not.toHaveBeenCalled();
@@ -335,7 +352,7 @@ describe('EmployeesController (HTTP)', () => {
     it('returns the employee', async () => {
       service.findOne.mockResolvedValue(employee);
 
-      const res = await http().get('/employees/emp-1').expect(200);
+      const res = await http().get('/api/v1/employees/emp-1').expect(200);
 
       expect(res.body).toEqual(employee);
       expect(service.findOne).toHaveBeenCalledWith('emp-1');
@@ -347,7 +364,7 @@ describe('EmployeesController (HTTP)', () => {
       service.update.mockResolvedValue(employee);
 
       await http()
-        .patch('/employees/emp-1')
+        .patch('/api/v1/employees/emp-1')
         .send({ version: 3, jobTitle: 'Engineering Manager' })
         .expect(200);
 
@@ -361,7 +378,7 @@ describe('EmployeesController (HTTP)', () => {
       service.update.mockResolvedValue(employee);
 
       await http()
-        .patch('/employees/emp-1')
+        .patch('/api/v1/employees/emp-1')
         .send({ version: 1, email: null })
         .expect(200);
 
@@ -375,7 +392,7 @@ describe('EmployeesController (HTTP)', () => {
       service.update.mockResolvedValue(employee);
 
       await http()
-        .patch('/employees/emp-1')
+        .patch('/api/v1/employees/emp-1')
         .send({ version: 1, lastName: null })
         .expect(200);
 
@@ -393,7 +410,7 @@ describe('EmployeesController (HTTP)', () => {
       ['invalid job title', { version: 1, jobTitle: 'Astronaut' }],
       ['client-supplied employeeCode', { version: 1, employeeCode: 'EMP-1' }],
     ])('returns 400 for %s', async (_label, body) => {
-      await http().patch('/employees/emp-1').send(body).expect(400);
+      await http().patch('/api/v1/employees/emp-1').send(body).expect(400);
       expect(service.update).not.toHaveBeenCalled();
     });
   });
@@ -402,7 +419,7 @@ describe('EmployeesController (HTTP)', () => {
     it('soft deletes and returns 200 with the deleted employee', async () => {
       service.softDelete.mockResolvedValue({ ...employee, status: 'DELETED' });
 
-      const res = await http().delete('/employees/emp-1').expect(200);
+      const res = await http().delete('/api/v1/employees/emp-1').expect(200);
 
       expect(res.body.status).toBe('DELETED');
       expect(service.softDelete).toHaveBeenCalledWith('emp-1');
@@ -413,7 +430,7 @@ describe('EmployeesController (HTTP)', () => {
     it('restores and returns 200', async () => {
       service.restore.mockResolvedValue({ ...employee, status: 'ACTIVE' });
 
-      const res = await http().post('/employees/emp-1/restore').expect(200);
+      const res = await http().post('/api/v1/employees/emp-1/restore').expect(200);
 
       expect(res.body.status).toBe('ACTIVE');
       expect(service.restore).toHaveBeenCalledWith('emp-1');
