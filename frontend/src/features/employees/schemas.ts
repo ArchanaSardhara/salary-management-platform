@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import type { Employee, EmployeeFormPayload, UpdateEmployeePayload } from "./types";
+import type {
+  Employee,
+  EmployeeFormPayload,
+  UpdateEmployeePayload,
+} from "./types";
 
 /** Mirrors the backend's employee field rules (employee-fields.ts). */
 const NAME_MAX = 100;
@@ -8,10 +12,13 @@ const EMAIL_MAX = 255;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const isoDate = (message: string) =>
-  z.string().regex(ISO_DATE, message).refine(
-    (value) => !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime()),
-    message,
-  );
+  z
+    .string()
+    .regex(ISO_DATE, message)
+    .refine(
+      (value) => !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime()),
+      message,
+    );
 
 export const employeeFormSchema = z
   .object({
@@ -33,17 +40,20 @@ export const employeeFormSchema = z
       }),
     countryCode: z.string().min(1, "Country is required"),
     department: z.string().min(1, "Department is required"),
-    jobTitle: z.string().min(1, "Designation is required"),
+    jobTitle: z.string().min(1, "Title is required"),
     startDate: z
       .string()
       .min(1, "Joining date is required")
       .pipe(isoDate("Enter a valid joining date")),
     endDate: z.union([z.literal(""), isoDate("Enter a valid end date")]),
   })
-  .refine((values) => values.endDate === "" || values.endDate >= values.startDate, {
-    message: "End date cannot be before the joining date",
-    path: ["endDate"],
-  });
+  .refine(
+    (values) => values.endDate === "" || values.endDate >= values.startDate,
+    {
+      message: "End date cannot be before the joining date",
+      path: ["endDate"],
+    },
+  );
 
 export type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
 
@@ -72,7 +82,9 @@ export function employeeToFormValues(employee: Employee): EmployeeFormValues {
 }
 
 /** Form values → API payload. Blank optional fields become null. */
-export function formValuesToPayload(values: EmployeeFormValues): EmployeeFormPayload {
+export function formValuesToPayload(
+  values: EmployeeFormValues,
+): EmployeeFormPayload {
   return {
     firstName: values.firstName.trim(),
     lastName: values.lastName.trim() || null,

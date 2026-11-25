@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,33 +16,57 @@ import {
 import { formatDate, getCountryName, getFullName } from "@/lib/format";
 import { cn } from "cn";
 
+import { DEFAULT_SORT_FIELD, DEFAULT_SORT_ORDER } from "../list-params";
 import { EMPLOYEE_ROUTES } from "../routes";
-import type { Employee } from "../types";
+import type { Employee, EmployeeSortField, SortOrder } from "../types";
 import { EmployeeRowActions } from "./employee-row-actions";
 import { EmployeeStatusBadge } from "./employee-status-badge";
 
-const COLUMNS = [
-  "ID",
-  "Name",
-  "Email",
-  "Country",
-  "Department",
-  "Title",
-  "Status",
-  "Joining Date",
-] as const;
+type ColumnDef =
+  | { label: string; sortField: EmployeeSortField; align?: "right" }
+  | { label: string; sortField?: undefined; align?: "right" };
+
+const COLUMNS: ColumnDef[] = [
+  { label: "ID",           sortField: "employeeNumber" },
+  { label: "Name",         sortField: "firstName" },
+  { label: "Email",        sortField: "email" },
+  { label: "Country",      sortField: "countryCode" },
+  { label: "Department",   sortField: "department" },
+  { label: "Title",        sortField: "jobTitle" },
+  { label: "Status" },
+  { label: "Joining Date", sortField: "startDate" },
+];
 
 interface EmployeesTableProps {
   employees: readonly Employee[] | undefined;
-  /** First load: render skeleton rows. */
   isLoading: boolean;
-  /** Showing previous results while new ones load. */
   isRefreshing: boolean;
   skeletonRows: number;
   onDelete: (employee: Employee) => void;
-  /** `top` offset (px) for the sticky table header — accounts for the
-   *  dashboard header + sticky filter bar above the table. */
+  sortBy: EmployeeSortField;
+  sortOrder: SortOrder;
+  onSort: (field: EmployeeSortField) => void;
+  /** `top` offset (px) for the sticky header. */
   tableHeadTop?: number;
+}
+
+function SortIcon({
+  field,
+  sortBy,
+  sortOrder,
+}: {
+  field: EmployeeSortField;
+  sortBy: EmployeeSortField;
+  sortOrder: SortOrder;
+}) {
+  if (sortBy !== field) {
+    return <ArrowUpDownIcon className="size-3.5 opacity-40" aria-hidden="true" />;
+  }
+  return sortOrder === "asc" ? (
+    <ArrowUpIcon className="size-3.5" aria-hidden="true" />
+  ) : (
+    <ArrowDownIcon className="size-3.5" aria-hidden="true" />
+  );
 }
 
 export function EmployeesTable({
@@ -50,8 +75,12 @@ export function EmployeesTable({
   isRefreshing,
   skeletonRows,
   onDelete,
+  sortBy,
+  sortOrder,
+  onSort,
   tableHeadTop = 56,
 }: EmployeesTableProps) {
+
   return (
     <div
       className={cn(
@@ -60,9 +89,6 @@ export function EmployeesTable({
       )}
       aria-busy={isLoading || isRefreshing}
     >
-      {/* table-fixed with no overflow on the container keeps all columns
-          visible without a horizontal scrollbar while allowing sticky <th>
-          elements to anchor to the page scroll (not a local scroll context). */}
       <Table containerClassName="relative w-full" className="table-fixed">
         <colgroup>
           <col className="w-[8%]" />
@@ -78,14 +104,32 @@ export function EmployeesTable({
         <TableCaption className="sr-only">Employee directory</TableCaption>
         <TableHeader>
           <TableRow>
-            {COLUMNS.map((column) => (
+            {COLUMNS.map(({ label, sortField, align }) => (
               <TableHead
-                key={column}
+                key={label}
                 scope="col"
-                className="sticky z-10 bg-secondary"
+                className={cn("sticky z-10 bg-secondary", align === "right" && "text-right")}
                 style={{ top: tableHeadTop }}
+                aria-sort={
+                  sortField && sortBy === sortField
+                    ? sortOrder === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : undefined
+                }
               >
-                {column}
+                {sortField ? (
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
+                    onClick={() => onSort(sortField)}
+                  >
+                    {label}
+                    <SortIcon field={sortField} sortBy={sortBy} sortOrder={sortOrder} />
+                  </button>
+                ) : (
+                  label
+                )}
               </TableHead>
             ))}
             <TableHead
@@ -134,16 +178,10 @@ export function EmployeesTable({
                   >
                     {getCountryName(employee.countryCode)}
                   </TableCell>
-                  <TableCell
-                    className="max-w-0 truncate"
-                    title={employee.department}
-                  >
+                  <TableCell className="max-w-0 truncate" title={employee.department}>
                     {employee.department}
                   </TableCell>
-                  <TableCell
-                    className="max-w-0 truncate"
-                    title={employee.jobTitle}
-                  >
+                  <TableCell className="max-w-0 truncate" title={employee.jobTitle}>
                     {employee.jobTitle}
                   </TableCell>
                   <TableCell>
@@ -153,10 +191,7 @@ export function EmployeesTable({
                     {formatDate(employee.startDate)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <EmployeeRowActions
-                      employee={employee}
-                      onDelete={onDelete}
-                    />
+                    <EmployeeRowActions employee={employee} onDelete={onDelete} />
                   </TableCell>
                 </TableRow>
               ))}

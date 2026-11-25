@@ -49,19 +49,26 @@ describe("employeeFormSchema", () => {
         "First name is required",
         "Country is required",
         "Department is required",
-        "Designation is required",
+        "Title is required",
         "Joining date is required",
       ]),
     );
   });
 
   it("rejects an invalid email but allows a blank one", () => {
-    expect(employeeFormSchema.safeParse({ ...validValues, email: "nope" }).success).toBe(false);
-    expect(employeeFormSchema.safeParse({ ...validValues, email: "" }).success).toBe(true);
+    expect(
+      employeeFormSchema.safeParse({ ...validValues, email: "nope" }).success,
+    ).toBe(false);
+    expect(
+      employeeFormSchema.safeParse({ ...validValues, email: "" }).success,
+    ).toBe(true);
   });
 
   it("rejects an end date before the joining date", () => {
-    const result = employeeFormSchema.safeParse({ ...validValues, endDate: "2025-12-31" });
+    const result = employeeFormSchema.safeParse({
+      ...validValues,
+      endDate: "2025-12-31",
+    });
     expect(result.error?.issues[0]).toMatchObject({
       path: ["endDate"],
       message: "End date cannot be before the joining date",
@@ -72,15 +79,28 @@ describe("employeeFormSchema", () => {
 describe("formValuesToPayload", () => {
   it("turns blank optional fields into null and normalises email", () => {
     expect(
-      formValuesToPayload({ ...validValues, lastName: " ", email: " ADA@Example.com ", endDate: "" }),
-    ).toMatchObject({ lastName: null, email: "ada@example.com", endDate: null });
+      formValuesToPayload({
+        ...validValues,
+        lastName: " ",
+        email: " ADA@Example.com ",
+        endDate: "",
+      }),
+    ).toMatchObject({
+      lastName: null,
+      email: "ada@example.com",
+      endDate: null,
+    });
   });
 });
 
 describe("buildUpdatePayload", () => {
   it("sends only changed fields with the version", () => {
     expect(
-      buildUpdatePayload(employee, { ...validValues, department: "Finance", email: "" }),
+      buildUpdatePayload(employee, {
+        ...validValues,
+        department: "Finance",
+        email: "",
+      }),
     ).toEqual({ department: "Finance", email: null, version: 3 });
   });
 

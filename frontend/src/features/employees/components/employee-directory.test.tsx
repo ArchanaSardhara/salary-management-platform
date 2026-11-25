@@ -78,12 +78,18 @@ function pagedList(total: number, overrides: Partial<Employee> = {}) {
   return (url: URL) => {
     const page = Number(url.searchParams.get("page"));
     const start = (page - 1) * PAGE_SIZE;
-    const data = Array.from({ length: Math.max(0, Math.min(PAGE_SIZE, total - start)) }, (_, i) =>
-      makeEmployee(start + i + 1, overrides),
+    const data = Array.from(
+      { length: Math.max(0, Math.min(PAGE_SIZE, total - start)) },
+      (_, i) => makeEmployee(start + i + 1, overrides),
     );
     return jsonResponse({
       data,
-      meta: { page, pageSize: PAGE_SIZE, total, totalPages: Math.ceil(total / PAGE_SIZE) },
+      meta: {
+        page,
+        pageSize: PAGE_SIZE,
+        total,
+        totalPages: Math.ceil(total / PAGE_SIZE),
+      },
     });
   };
 }
@@ -91,9 +97,15 @@ function pagedList(total: number, overrides: Partial<Employee> = {}) {
 function mockApi(list: (url: URL) => Response | Promise<Response>) {
   fetchMock.mockImplementation(async (input, init) => {
     const url = new URL(String(input));
-    if (url.pathname.endsWith("/employees/options")) return jsonResponse(options);
+    if (url.pathname.endsWith("/employees/options"))
+      return jsonResponse(options);
     if (init?.method === "DELETE") {
-      return jsonResponse(makeEmployee(1, { status: "DELETED", deletedAt: "2026-11-24T10:00:00Z" }));
+      return jsonResponse(
+        makeEmployee(1, {
+          status: "DELETED",
+          deletedAt: "2026-11-24T10:00:00Z",
+        }),
+      );
     }
     return list(url);
   });
@@ -124,17 +136,19 @@ describe("EmployeeDirectory", () => {
     expect(screen.getByText(/employees in total/)).toBeInTheDocument();
 
     for (const column of [
-      "Employee ID",
-      "Employee Name",
+      "ID",
+      "Name",
       "Email",
       "Country",
       "Department",
-      "Designation",
-      "Employment Status",
+      "Title",
+      "Status",
       "Joining Date",
       "Actions",
     ]) {
-      expect(screen.getByRole("columnheader", { name: column })).toBeInTheDocument();
+      expect(
+        screen.getByRole("columnheader", { name: column }),
+      ).toBeInTheDocument();
     }
 
     const row = screen.getByRole("row", { name: /Priya Sharma/ });
@@ -157,15 +171,27 @@ describe("EmployeeDirectory", () => {
     expect(screen.getByText("Showing 25 of 60 employees")).toBeInTheDocument();
 
     await scrollToEnd();
-    expect(await screen.findByText("Showing 50 of 60 employees")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Showing 50 of 60 employees"),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(1 + 50);
 
     await scrollToEnd();
-    expect(await screen.findByText("All 60 employees loaded")).toBeInTheDocument();
+    expect(
+      await screen.findByText("All 60 employees loaded"),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(1 + 60);
-    expect(listCalls().map((url) => url.searchParams.get("page"))).toEqual(["1", "2", "3"]);
-    expect(listCalls().every((url) => url.searchParams.get("pageSize") === "25")).toBe(true);
-    expect(screen.queryByRole("button", { name: /Load .* more/ })).not.toBeInTheDocument();
+    expect(listCalls().map((url) => url.searchParams.get("page"))).toEqual([
+      "1",
+      "2",
+      "3",
+    ]);
+    expect(
+      listCalls().every((url) => url.searchParams.get("pageSize") === "25"),
+    ).toBe(true);
+    expect(
+      screen.queryByRole("button", { name: /Load .* more/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("offers a Load more button that fetches the next batch", async () => {
@@ -176,7 +202,9 @@ describe("EmployeeDirectory", () => {
 
     await user.click(screen.getByRole("button", { name: "Load 5 more" }));
 
-    expect(await screen.findByText("All 30 employees loaded")).toBeInTheDocument();
+    expect(
+      await screen.findByText("All 30 employees loaded"),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(1 + 30);
   });
 
@@ -195,15 +223,21 @@ describe("EmployeeDirectory", () => {
     await screen.findByText("Priya Sharma");
 
     await scrollToEnd();
-    expect(await screen.findByText("Unable to load more employees")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Unable to load more employees"),
+    ).toBeInTheDocument();
     // The first page stays visible.
     expect(screen.getAllByRole("row")).toHaveLength(1 + 25);
     // While the error is shown, the list does not observe its end (no retry loop).
     expect(observers.size).toBe(0);
-    expect(listCalls().filter((url) => url.searchParams.get("page") === "2")).toHaveLength(1);
+    expect(
+      listCalls().filter((url) => url.searchParams.get("page") === "2"),
+    ).toHaveLength(1);
 
     await user.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("Showing 50 of 60 employees")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Showing 50 of 60 employees"),
+    ).toBeInTheDocument();
   });
 
   it("sends multi-value URL filters to the API as repeated keys", async () => {
@@ -215,7 +249,10 @@ describe("EmployeeDirectory", () => {
     await screen.findByText("Priya Sharma");
     const url = listCalls()[0];
     expect(url.searchParams.getAll("countryCode")).toEqual(["IN", "US"]);
-    expect(url.searchParams.getAll("department")).toEqual(["Engineering", "Finance"]);
+    expect(url.searchParams.getAll("department")).toEqual([
+      "Engineering",
+      "Finance",
+    ]);
     expect(url.searchParams.getAll("status")).toEqual(["active", "deleted"]);
     expect(url.searchParams.get("search")).toBe("ada");
     expect(url.searchParams.get("page")).toBe("1");
@@ -238,7 +275,9 @@ describe("EmployeeDirectory", () => {
     renderWithQueryClient(<EmployeeDirectory />);
 
     await screen.findByText("Priya Sharma");
-    await waitFor(() => expect(screen.getByText("India +1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("India +1")).toBeInTheDocument(),
+    );
     expect(screen.getByText("Finance")).toBeInTheDocument();
   });
 
@@ -264,10 +303,14 @@ describe("EmployeeDirectory", () => {
     renderWithQueryClient(<EmployeeDirectory />);
     await screen.findByText("Priya Sharma");
 
-    await user.click(screen.getByRole("combobox", { name: "Employment status" }));
+    await user.click(
+      screen.getByRole("combobox", { name: "Employment status" }),
+    );
     await user.click(await screen.findByRole("option", { name: "Active" }));
 
-    expect(replace).toHaveBeenLastCalledWith("/employees?status=all", { scroll: false });
+    expect(replace).toHaveBeenLastCalledWith("/employees?status=all", {
+      scroll: false,
+    });
   });
 
   it("updates the URL after a debounced search", async () => {
@@ -276,10 +319,17 @@ describe("EmployeeDirectory", () => {
     renderWithQueryClient(<EmployeeDirectory />);
     await screen.findByText("Priya Sharma");
 
-    await user.type(screen.getByLabelText("Search employees by name, email or employee ID"), "EMP-1");
+    await user.type(
+      screen.getByLabelText("Search employees by name, email or employee ID"),
+      "EMP-1",
+    );
 
-    await waitFor(() => expect(replace).toHaveBeenCalledTimes(1), { timeout: 2000 });
-    expect(replace).toHaveBeenCalledWith("/employees?q=EMP-1", { scroll: false });
+    await waitFor(() => expect(replace).toHaveBeenCalledTimes(1), {
+      timeout: 2000,
+    });
+    expect(replace).toHaveBeenCalledWith("/employees?q=EMP-1", {
+      scroll: false,
+    });
   });
 
   it("clears all filters back to the defaults", async () => {
@@ -299,7 +349,9 @@ describe("EmployeeDirectory", () => {
     renderWithQueryClient(<EmployeeDirectory />);
     await screen.findByText("Priya Sharma");
 
-    expect(screen.getByRole("button", { name: "Clear filters" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Clear filters" }),
+    ).toBeDisabled();
   });
 
   it("shows a no-results state when filters match nothing", async () => {
@@ -307,7 +359,9 @@ describe("EmployeeDirectory", () => {
     mockApi(pagedList(0));
     renderWithQueryClient(<EmployeeDirectory />);
 
-    expect(await screen.findByText("No employees match your filters")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No employees match your filters"),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
@@ -322,11 +376,15 @@ describe("EmployeeDirectory", () => {
     mockApi(() => jsonResponse({ statusCode: 500, message: "boom" }, 500));
     renderWithQueryClient(<EmployeeDirectory />);
 
-    expect(await screen.findByText("Unable to load employees")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Unable to load employees"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("boom")).not.toBeInTheDocument();
 
     mockApi(pagedList(1));
-    await userEvent.setup().click(screen.getByRole("button", { name: "Try again" }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Priya Sharma")).toBeInTheDocument();
   });
 
@@ -336,14 +394,22 @@ describe("EmployeeDirectory", () => {
     renderWithQueryClient(<EmployeeDirectory />);
     await screen.findByText("Priya Sharma");
 
-    await user.click(screen.getByRole("button", { name: "Actions for Priya Sharma" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Delete employee" }));
+    await user.click(
+      screen.getByRole("button", { name: "Actions for Priya Sharma" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Delete employee" }),
+    );
 
     const dialog = await screen.findByRole("alertdialog");
-    expect(within(dialog).getByText(/Priya Sharma \(EMP-000001\)/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/Priya Sharma \(EMP-000001\)/),
+    ).toBeInTheDocument();
     const listCallsBefore = listCalls().length;
 
-    await user.click(within(dialog).getByRole("button", { name: "Delete employee" }));
+    await user.click(
+      within(dialog).getByRole("button", { name: "Delete employee" }),
+    );
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -351,29 +417,35 @@ describe("EmployeeDirectory", () => {
         expect.objectContaining({ method: "DELETE" }),
       ),
     );
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
-    await waitFor(() => expect(listCalls().length).toBeGreaterThan(listCallsBefore));
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(listCalls().length).toBeGreaterThan(listCallsBefore),
+    );
   });
 
   it("disables edit and delete for a deleted employee", async () => {
     currentSearch = "status=deleted";
-    mockApi(pagedList(1, { status: "DELETED", deletedAt: "2026-11-01T00:00:00Z" }));
+    mockApi(
+      pagedList(1, { status: "DELETED", deletedAt: "2026-11-01T00:00:00Z" }),
+    );
     const user = userEvent.setup();
     renderWithQueryClient(<EmployeeDirectory />);
     await screen.findByText("Priya Sharma");
 
-    await user.click(screen.getByRole("button", { name: "Actions for Priya Sharma" }));
+    await user.click(
+      screen.getByRole("button", { name: "Actions for Priya Sharma" }),
+    );
 
-    expect(await screen.findByRole("menuitem", { name: "View employee" })).not.toHaveAttribute(
-      "aria-disabled",
-    );
-    expect(screen.getByRole("menuitem", { name: "Edit employee" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
-    expect(screen.getByRole("menuitem", { name: "Delete employee" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
+    expect(
+      await screen.findByRole("menuitem", { name: "View employee" }),
+    ).not.toHaveAttribute("aria-disabled");
+    expect(
+      screen.getByRole("menuitem", { name: "Edit employee" }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(
+      screen.getByRole("menuitem", { name: "Delete employee" }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 });

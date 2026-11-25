@@ -48,7 +48,11 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
 });
 
-async function choose(user: ReturnType<typeof userEvent.setup>, label: string, option: string) {
+async function choose(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  option: string,
+) {
   await user.click(screen.getByLabelText(label));
   await user.click(await screen.findByRole("option", { name: option }));
 }
@@ -61,8 +65,10 @@ function requestBody(method: string): unknown {
 describe("CreateEmployeeView", () => {
   beforeEach(() => {
     fetchMock.mockImplementation(async (input, init) => {
-      if (String(input).endsWith("/employees/options")) return jsonResponse(options);
-      if (init?.method === "POST") return jsonResponse({ ...employee, id: "emp-new" }, 201);
+      if (String(input).endsWith("/employees/options"))
+        return jsonResponse(options);
+      if (init?.method === "POST")
+        return jsonResponse({ ...employee, id: "emp-new" }, 201);
       return jsonResponse({}, 404);
     });
   });
@@ -71,12 +77,16 @@ describe("CreateEmployeeView", () => {
     const user = userEvent.setup();
     renderWithQueryClient(<CreateEmployeeView />);
 
-    await user.click(await screen.findByRole("button", { name: "Add employee" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Add employee" }),
+    );
 
-    expect(await screen.findByText("First name is required")).toBeInTheDocument();
+    expect(
+      await screen.findByText("First name is required"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Country is required")).toBeInTheDocument();
     expect(screen.getByText("Department is required")).toBeInTheDocument();
-    expect(screen.getByText("Designation is required")).toBeInTheDocument();
+    expect(screen.getByText("Title is required")).toBeInTheDocument();
     expect(screen.getByText("Joining date is required")).toBeInTheDocument();
     expect(requestBody("POST")).toBeUndefined();
   });
@@ -89,11 +99,13 @@ describe("CreateEmployeeView", () => {
     await user.type(screen.getByLabelText(/Email/), "Priya@Example.com");
     await choose(user, "Country", "India");
     await choose(user, "Department", "Engineering");
-    await choose(user, "Designation", "Software Engineer");
+    await choose(user, "Title", "Software Engineer");
     await user.type(screen.getByLabelText("Joining date"), "2026-01-15");
     await user.click(screen.getByRole("button", { name: "Add employee" }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/employees/emp-new"));
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/employees/emp-new"),
+    );
     expect(requestBody("POST")).toEqual({
       firstName: "Priya",
       lastName: null,
@@ -108,10 +120,14 @@ describe("CreateEmployeeView", () => {
 
   it("shows the API error when the email is taken", async () => {
     fetchMock.mockImplementation(async (input, init) => {
-      if (String(input).endsWith("/employees/options")) return jsonResponse(options);
+      if (String(input).endsWith("/employees/options"))
+        return jsonResponse(options);
       if (init?.method === "POST") {
         return jsonResponse(
-          { statusCode: 409, message: "An employee with this email already exists" },
+          {
+            statusCode: 409,
+            message: "An employee with this email already exists",
+          },
           409,
         );
       }
@@ -123,7 +139,7 @@ describe("CreateEmployeeView", () => {
     await user.type(await screen.findByLabelText("First name"), "Priya");
     await choose(user, "Country", "India");
     await choose(user, "Department", "Finance");
-    await choose(user, "Designation", "Accountant");
+    await choose(user, "Title", "Accountant");
     await user.type(screen.getByLabelText("Joining date"), "2026-01-15");
     await user.click(screen.getByRole("button", { name: "Add employee" }));
 
@@ -141,12 +157,17 @@ describe("EditEmployeeView", () => {
       if (url.endsWith("/employees/options")) return jsonResponse(options);
       if (init?.method === "PATCH") return patchResponse();
       if (url.endsWith("/employees/emp-1")) return jsonResponse(employee);
-      return jsonResponse({ statusCode: 404, message: "Employee not found" }, 404);
+      return jsonResponse(
+        { statusCode: 404, message: "Employee not found" },
+        404,
+      );
     });
   }
 
   it("prefills the form and saves only changed fields with the version", async () => {
-    mockEdit(() => jsonResponse({ ...employee, department: "Finance", version: 5 }));
+    mockEdit(() =>
+      jsonResponse({ ...employee, department: "Finance", version: 5 }),
+    );
     const user = userEvent.setup();
     renderWithQueryClient(<EditEmployeeView id="emp-1" />);
 
@@ -171,7 +192,8 @@ describe("EditEmployeeView", () => {
       jsonResponse(
         {
           statusCode: 409,
-          message: "This employee was changed by someone else; reload to see the latest version",
+          message:
+            "This employee was changed by someone else; reload to see the latest version",
         },
         409,
       ),
@@ -183,7 +205,9 @@ describe("EditEmployeeView", () => {
     await user.type(screen.getByLabelText("First name"), "Priyanka");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(await screen.findByText(/changed by someone else/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/changed by someone else/),
+    ).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
   });
 

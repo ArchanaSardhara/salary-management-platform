@@ -24,6 +24,8 @@ export function listEmployees(
     search: filters.search,
     countryCode: filters.countryCodes,
     department: filters.departments,
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortOrder,
   });
   return apiRequest<EmployeeListResponse>(`/employees${query}`);
 }

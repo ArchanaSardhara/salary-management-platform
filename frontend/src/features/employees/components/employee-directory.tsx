@@ -16,6 +16,8 @@ import { formatNumber } from "@/lib/format";
 import { useInfiniteEmployees, useEmployeeOptions } from "../hooks";
 import {
   DEFAULT_FILTERS,
+  DEFAULT_SORT_FIELD,
+  DEFAULT_SORT_ORDER,
   filtersToSearchParams,
   hasActiveFilters as getHasActiveFilters,
   LIST_PARAM_DEFAULTS,
@@ -23,7 +25,7 @@ import {
   SCROLL_PAGE_SIZE,
 } from "../list-params";
 import { EMPLOYEE_ROUTES } from "../routes";
-import type { Employee, EmployeeListFilters } from "../types";
+import type { Employee, EmployeeListFilters, EmployeeSortField } from "../types";
 import { DeleteEmployeeDialog } from "./delete-employee-dialog";
 import { EmployeeFilters } from "./employee-filters";
 import { EmployeeListFooter } from "./employee-list-footer";
@@ -70,6 +72,16 @@ export function EmployeeDirectory() {
     setParams(filtersToSearchParams({ ...filters, ...change }));
 
   const clearFilters = () => setParams(filtersToSearchParams(DEFAULT_FILTERS));
+
+  function handleSort(field: EmployeeSortField) {
+    if (filters.sortBy !== field) {
+      changeFilters({ sortBy: field, sortOrder: "asc" });
+    } else if (filters.sortOrder === "asc") {
+      changeFilters({ sortOrder: "desc" });
+    } else {
+      changeFilters({ sortBy: DEFAULT_SORT_FIELD, sortOrder: DEFAULT_SORT_ORDER });
+    }
+  }
 
   const loadMore = () => {
     if (employees.hasNextPage && !employees.isFetchingNextPage) {
@@ -159,6 +171,9 @@ export function EmployeeDirectory() {
               isRefreshing={isRefreshing}
               skeletonRows={10}
               onDelete={setEmployeeToDelete}
+              sortBy={filters.sortBy}
+              sortOrder={filters.sortOrder}
+              onSort={handleSort}
               tableHeadTop={DASHBOARD_HEADER_H + filterBarH}
             />
             {!isFirstLoad && total !== undefined ? (

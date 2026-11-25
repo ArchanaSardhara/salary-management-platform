@@ -8,7 +8,12 @@ import { Controller, useForm } from "react-hook-form";
 import { FormAlert } from "@/components/form/form-alert";
 import { SelectField } from "@/components/form/select-field";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { getCountryName } from "@/lib/format";
@@ -30,7 +35,12 @@ interface EmployeeFormProps {
   requireChanges?: boolean;
 }
 
-type TextFieldName = "firstName" | "lastName" | "email" | "startDate" | "endDate";
+type TextFieldName =
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "startDate"
+  | "endDate";
 
 export function EmployeeForm({
   options,
@@ -59,7 +69,9 @@ export function EmployeeForm({
   const toOptions = (values: readonly string[]) =>
     values.map((value) => ({ value, label: value }));
 
-  const optional = <span className="font-normal text-muted-foreground">(optional)</span>;
+  const optional = (
+    <span className="font-normal text-muted-foreground">(optional)</span>
+  );
 
   const textField = (
     name: TextFieldName,
@@ -87,15 +99,24 @@ export function EmployeeForm({
     <form onSubmit={handleSubmit(onSubmit)} noValidate aria-label={submitLabel}>
       <FieldGroup>
         {errorMessage ? (
-          <FormAlert variant="error" title="Unable to save employee" message={errorMessage} />
+          <FormAlert
+            variant="error"
+            title="Unable to save employee"
+            message={errorMessage}
+          />
         ) : null}
 
         <div className="grid gap-5 sm:grid-cols-2">
           {textField("firstName", "First name", { autoComplete: "off" })}
-          {textField("lastName", <>Last name {optional}</>, { autoComplete: "off" })}
+          {textField("lastName", <>Last name {optional}</>, {
+            autoComplete: "off",
+          })}
         </div>
 
-        {textField("email", <>Email {optional}</>, { type: "email", autoComplete: "off" })}
+        {textField("email", <>Email {optional}</>, {
+          type: "email",
+          autoComplete: "off",
+        })}
 
         <div className="grid gap-5 sm:grid-cols-3">
           <Controller
@@ -133,8 +154,8 @@ export function EmployeeForm({
             control={control}
             render={({ field, fieldState }) => (
               <SelectField
-                label="Designation"
-                placeholder="Select a designation"
+                label="Title"
+                placeholder="Select a title"
                 options={toOptions(options.jobTitles)}
                 value={field.value}
                 onChange={field.onChange}
@@ -151,7 +172,10 @@ export function EmployeeForm({
         </div>
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Link href={cancelHref} className={buttonVariants({ variant: "outline", size: "lg" })}>
+          <Link
+            href={cancelHref}
+            className={buttonVariants({ variant: "outline", size: "lg" })}
+          >
             Cancel
           </Link>
           <Button

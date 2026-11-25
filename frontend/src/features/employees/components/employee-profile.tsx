@@ -9,7 +9,12 @@ import { QueryError } from "@/components/query-error";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDate, formatDateTime, getCountryName, getFullName } from "@/lib/format";
+import {
+  formatDate,
+  formatDateTime,
+  getCountryName,
+  getFullName,
+} from "@/lib/format";
 
 import { useEmployee } from "../hooks";
 import { EMPLOYEE_ROUTES } from "../routes";
@@ -20,14 +25,20 @@ import { EmployeeStatusBadge } from "./employee-status-badge";
 
 export function EmployeeProfile({ id }: { id: string }) {
   const employee = useEmployee(id);
-  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
+    null,
+  );
 
   const backLink = (
     <Link
       href={EMPLOYEE_ROUTES.list}
-      className={buttonVariants({ variant: "ghost", size: "sm", className: "-ml-2 w-fit" })}
+      className={buttonVariants({
+        variant: "ghost",
+        size: "sm",
+        className: "-ml-2 w-fit",
+      })}
     >
-      <ArrowLeftIcon aria-hidden="true" />
+      <ArrowLeftIcon aria-hidden="true" size="sm" />
       Employees
     </Link>
   );
@@ -63,16 +74,24 @@ export function EmployeeProfile({ id }: { id: string }) {
   const isDeleted = data.status === "DELETED";
 
   const details: { label: string; value: ReactNode }[] = [
-    { label: "Employee ID", value: <span className="font-mono">{data.employeeCode}</span> },
+    {
+      label: "Employee ID",
+      value: <span className="font-mono">{data.employeeCode}</span>,
+    },
     { label: "Email", value: data.email ?? "—" },
     { label: "Country", value: getCountryName(data.countryCode) },
     { label: "Department", value: data.department },
-    { label: "Designation", value: data.jobTitle },
-    { label: "Employment status", value: <EmployeeStatusBadge status={data.status} /> },
+    { label: "Title", value: data.jobTitle },
+    {
+      label: "Employment status",
+      value: <EmployeeStatusBadge status={data.status} />,
+    },
     { label: "Joining date", value: formatDate(data.startDate) },
     { label: "End date", value: formatDate(data.endDate) },
     { label: "Last updated", value: formatDateTime(data.updatedAt) },
-    ...(data.deletedAt ? [{ label: "Deleted on", value: formatDateTime(data.deletedAt) }] : []),
+    ...(data.deletedAt
+      ? [{ label: "Deleted on", value: formatDateTime(data.deletedAt) }]
+      : []),
   ];
 
   return (
@@ -91,7 +110,11 @@ export function EmployeeProfile({ id }: { id: string }) {
                 <PencilIcon aria-hidden="true" />
                 Edit employee
               </Link>
-              <Button variant="destructive" size="lg" onClick={() => setEmployeeToDelete(data)}>
+              <Button
+                variant="destructive"
+                size="lg"
+                onClick={() => setEmployeeToDelete(data)}
+              >
                 <Trash2Icon aria-hidden="true" />
                 Delete employee
               </Button>
@@ -110,7 +133,9 @@ export function EmployeeProfile({ id }: { id: string }) {
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
             {details.map((item) => (
               <div key={item.label} className="flex flex-col gap-1">
-                <dt className="text-xs font-medium text-muted-foreground">{item.label}</dt>
+                <dt className="text-xs font-medium text-muted-foreground">
+                  {item.label}
+                </dt>
                 <dd className="text-sm">{item.value}</dd>
               </div>
             ))}

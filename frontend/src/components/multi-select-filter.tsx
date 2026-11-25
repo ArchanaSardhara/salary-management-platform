@@ -41,6 +41,11 @@ export function summarizeSelection(
   return values.length === 1 ? first : `${first} +${values.length - 1}`;
 }
 
+// Sentinel used for the "All …" option inside the multi-select.
+// Real filter values are country codes, department names, and status strings —
+// none of which can be an empty string.
+const ALL_VALUE = "";
+
 /** Labeled multi-select filter. The popup stays open while toggling options. */
 export function MultiSelectFilter({
   label,
@@ -54,6 +59,20 @@ export function MultiSelectFilter({
   const labelId = useId();
   const summary = summarizeSelection(values, options, allLabel);
 
+  // Show the "All" sentinel as checked when nothing is selected.
+  const selectValue = values.length === 0 ? [ALL_VALUE] : [...values];
+
+  function handleChange(next: unknown) {
+    const raw = Array.isArray(next) ? (next as string[]).filter((v) => typeof v === "string") : [];
+    if (raw.includes(ALL_VALUE) && values.length > 0) {
+      // User explicitly clicked "All …" while something was selected → clear.
+      onChange([]);
+    } else {
+      // Normal toggle; strip the sentinel in case it slipped through.
+      onChange(raw.filter((v) => v !== ALL_VALUE));
+    }
+  }
+
   return (
     <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
       <span id={labelId} className="text-xs font-medium text-muted-foreground">
@@ -62,11 +81,9 @@ export function MultiSelectFilter({
       <Select
         multiple
         items={options}
-        value={[...values]}
+        value={selectValue}
         disabled={disabled}
-        onValueChange={(next) =>
-          onChange(Array.isArray(next) ? next.filter((item) => typeof item === "string") : [])
-        }
+        onValueChange={handleChange}
       >
         <SelectTrigger aria-labelledby={labelId} className="w-full">
           <SelectValue className={cn(values.length === 0 && "text-muted-foreground")}>
@@ -74,6 +91,9 @@ export function MultiSelectFilter({
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value={ALL_VALUE} className="text-muted-foreground">
+            {allLabel}
+          </SelectItem>
           {options.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {option.label}
