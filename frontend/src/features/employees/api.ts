@@ -2,11 +2,13 @@ import { apiRequest } from "@/lib/api-client";
 import { toQueryString } from "@/lib/search-params";
 
 import type {
+  AuditLogEntry,
   CreateEmployeePayload,
   Employee,
   EmployeeListFilters,
   EmployeeListResponse,
   EmployeeOptions,
+  PaginatedCompensation,
   UpdateEmployeePayload,
 } from "./types";
 
@@ -52,4 +54,24 @@ export function updateEmployee(id: string, payload: UpdateEmployeePayload): Prom
 /** Soft delete: the backend keeps the record and marks it deleted. */
 export function deleteEmployee(id: string): Promise<Employee> {
   return apiRequest<Employee>(`/employees/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function listCompensationRecords(
+  employeeId: string,
+  page = 1,
+  pageSize = 50,
+): Promise<PaginatedCompensation> {
+  const query = toQueryString({ page, pageSize });
+  return apiRequest<PaginatedCompensation>(
+    `/employees/${encodeURIComponent(employeeId)}/compensation${query}`,
+  );
+}
+
+export function getCompensationAuditLog(
+  employeeId: string,
+  recordId: string,
+): Promise<AuditLogEntry> {
+  return apiRequest<AuditLogEntry>(
+    `/employees/${encodeURIComponent(employeeId)}/compensation/${encodeURIComponent(recordId)}/audit`,
+  );
 }

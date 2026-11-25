@@ -11,8 +11,10 @@ import {
 import {
   createEmployee,
   deleteEmployee,
+  getCompensationAuditLog,
   getEmployee,
   getEmployeeOptions,
+  listCompensationRecords,
   listEmployees,
   updateEmployee,
 } from "./api";
@@ -92,5 +94,30 @@ export function useDeleteEmployee() {
       queryClient.setQueryData(employeeKeys.detail(employee.id), employee);
       void queryClient.invalidateQueries({ queryKey: employeeKeys.lists() });
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Compensation
+// ---------------------------------------------------------------------------
+
+export const compensationKeys = {
+  all: (employeeId: string) => ["compensation", employeeId] as const,
+  list: (employeeId: string) => [...compensationKeys.all(employeeId), "list"] as const,
+  audit: (employeeId: string, recordId: string) =>
+    [...compensationKeys.all(employeeId), "audit", recordId] as const,
+};
+
+export function useCompensationRecords(employeeId: string) {
+  return useQuery({
+    queryKey: compensationKeys.list(employeeId),
+    queryFn: () => listCompensationRecords(employeeId),
+  });
+}
+
+export function useCompensationAuditLog(employeeId: string, recordId: string) {
+  return useQuery({
+    queryKey: compensationKeys.audit(employeeId, recordId),
+    queryFn: () => getCompensationAuditLog(employeeId, recordId),
   });
 }

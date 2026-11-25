@@ -927,7 +927,7 @@ Build the frontend Login (`/login`), Register (`/register`), Forgot Password (`/
 
 ## 12. Employee directory (search, filters, pagination) with create, view, edit and delete
 
-**What was asked:** Implement the Employee Directory: total employee count, search, filter controls, data table (Employee ID, Name, Email, Country, Department, Designation, Employment Status, Joining Date, Actions), server-side pagination (configurable page size, current page, total records, total pages, previous/next with disabled states), an Add Employee button, and View/Edit/Delete row actions. Debounced search by name/email/employee ID; country, department and employment-status filters; clear all filters; filters and pagination preserved in URL search params. Create the needed common UI components, hooks and utils.
+**What was asked:** Implement the Employee Directory: total employee count, search, filter controls, data table (Employee ID, Name, Email, Country, Department, Title, Employment Status, Joining Date, Actions), server-side pagination (configurable page size, current page, total records, total pages, previous/next with disabled states), an Add Employee button, and View/Edit/Delete row actions. Debounced search by name/email/employee ID; country, department and employment-status filters; clear all filters; filters and pagination preserved in URL search params. Create the needed common UI components, hooks and utils.
 
 **Developer decisions (asked in chat before building):**
 - Add/View/Edit: **build the pages too** (`/employees/new`, `/employees/[id]`, `/employees/[id]/edit`) rather than linking to routes that don't exist.
@@ -949,7 +949,7 @@ Build the frontend Login (`/login`), Register (`/register`), Forgot Password (`/
 
 **Technical decisions:**
 - "Employment Status" maps to the backend's existing status: Active vs Deleted (soft-deleted). Filter options Active (default) / Deleted / All statuses.
-- "Designation" = `jobTitle`; "Joining Date" = `startDate`; "Employee ID" = `employeeCode`.
+- "Title" = `jobTitle`; "Joining Date" = `startDate`; "Employee ID" = `employeeCode`.
 - Delete is the backend's soft delete, behind a confirmation dialog. Edit and Delete are disabled for deleted employees (the backend rejects edits of deleted records).
 - Search input holds local text and commits after 300 ms (debounced in the event handler, not an effect). It follows outside URL changes (Clear filters, back/forward) unless an edit is pending.
 - Any filter change resets to page 1. A page number past the last page shows a "Go to last page" state.

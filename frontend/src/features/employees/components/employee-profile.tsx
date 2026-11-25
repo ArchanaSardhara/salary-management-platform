@@ -20,6 +20,7 @@ import { useEmployee } from "../hooks";
 import { EMPLOYEE_ROUTES } from "../routes";
 import type { Employee } from "../types";
 import { DeleteEmployeeDialog } from "./delete-employee-dialog";
+import { EmployeeCompensation } from "./employee-compensation";
 import { EmployeeNotFound, isNotFoundError } from "./employee-not-found";
 import { EmployeeStatusBadge } from "./employee-status-badge";
 
@@ -142,6 +143,8 @@ export function EmployeeProfile({ id }: { id: string }) {
           </dl>
         </CardContent>
       </Card>
+
+      <EmployeeCompensation employeeId={data.id} />
 
       <DeleteEmployeeDialog
         employee={employeeToDelete}

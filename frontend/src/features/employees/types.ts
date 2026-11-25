@@ -67,6 +67,58 @@ export interface EmployeeListFilters {
   sortOrder: SortOrder;
 }
 
+// ---------------------------------------------------------------------------
+// Compensation
+// ---------------------------------------------------------------------------
+
+export type PayFrequency = "MONTHLY" | "SEMI_MONTHLY" | "BI_WEEKLY" | "WEEKLY" | "ANNUAL";
+export type CompensationType =
+  | "BASE_SALARY"
+  | "BONUS"
+  | "COMMISSION"
+  | "EQUITY_GRANT"
+  | "ALLOWANCE";
+
+export interface CompensationRecord {
+  id: string;
+  employeeId: string;
+  amount: string;
+  currencyCode: string;
+  payFrequency: PayFrequency;
+  type: CompensationType;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  changeReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompensationSnapshot {
+  amount: string;
+  currencyCode: string;
+  payFrequency: PayFrequency;
+  type: CompensationType;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  changeReason: string | null;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  compensationRecordId: string;
+  changedById: string | null;
+  changedAt: string;
+  beforeValue: CompensationSnapshot | null;
+  afterValue: CompensationSnapshot;
+}
+
+export interface PaginatedCompensation {
+  data: CompensationRecord[];
+  meta: { page: number; pageSize: number; total: number; totalPages: number };
+}
+
+// ---------------------------------------------------------------------------
+
 export interface EmployeeFormPayload {
   firstName: string;
   lastName: string | null;
