@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDownIcon, ChevronRightIcon, ReceiptTextIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, PencilIcon, PlusIcon, ReceiptTextIcon } from "lucide-react";
 import { useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -19,8 +19,10 @@ import {
 import { formatDate, formatDateTime } from "@/lib/format";
 import { cn } from "cn";
 
-import { useCompensationAuditLog, useCompensationRecords } from "../hooks";
+import { useCompensationAuditLog, useCompensationRecords, COMPENSATION_PAGE_SIZE } from "../hooks";
+import { EditEndDateDialog } from "./edit-end-date-dialog";
 import type { AuditLogEntry, CompensationRecord, CompensationSnapshot } from "../types";
+import { AddCompensationDialog } from "./add-compensation-dialog";
 
 // ---------------------------------------------------------------------------
 // Display maps
@@ -200,6 +202,7 @@ function CompensationRow({
   employeeId: string;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const isActive = record.effectiveTo === null;
 
   return (
@@ -232,25 +235,37 @@ function CompensationRow({
           {record.changeReason ?? "—"}
         </TableCell>
         <TableCell className="text-right">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1 text-xs"
-            onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
-          >
-            {expanded ? (
-              <>
-                <ChevronDownIcon className="size-3.5" aria-hidden="true" />
-                Hide
-              </>
-            ) : (
-              <>
-                <ChevronRightIcon className="size-3.5" aria-hidden="true" />
-                Changes
-              </>
-            )}
-          </Button>
+          <div className="flex items-center justify-end gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              onClick={() => setEditOpen(true)}
+              aria-label="Edit end date"
+              title="Edit end date"
+            >
+              <PencilIcon className="size-3.5" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-xs"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+            >
+              {expanded ? (
+                <>
+                  <ChevronDownIcon className="size-3.5" aria-hidden="true" />
+                  Hide
+                </>
+              ) : (
+                <>
+                  <ChevronRightIcon className="size-3.5" aria-hidden="true" />
+                  Changes
+                </>
+              )}
+            </Button>
+          </div>
         </TableCell>
       </TableRow>
       {expanded && (
@@ -263,7 +278,103 @@ function CompensationRow({
           </TableCell>
         </TableRow>
       )}
+      <EditEndDateDialog
+        employeeId={employeeId}
+        record={record}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pagination
+// ---------------------------------------------------------------------------
+
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "...")[] = [1];
+  if (current > 3) pages.push("...");
+  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) {
+    pages.push(p);
+  }
+  if (current < total - 2) pages.push("...");
+  pages.push(total);
+  return pages;
+}
+
+function CompensationPagination({
+  page,
+  totalPages,
+  total,
+  pageSize,
+  onPageChange,
+  disabled,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (p: number) => void;
+  disabled?: boolean;
+}) {
+  if (totalPages <= 1 && total <= pageSize) return null;
+
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+  const pages = getPageNumbers(page, totalPages);
+
+  return (
+    <div className="flex items-center justify-between border-t px-4 py-3">
+      <p className="text-sm text-muted-foreground">
+        {total === 0 ? "No records" : `${start}–${end} of ${total}`}
+      </p>
+      {totalPages > 1 && (
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page <= 1 || disabled}
+            aria-label="Previous page"
+          >
+            <ChevronLeftIcon className="size-4" />
+          </Button>
+          {pages.map((p, i) =>
+            p === "..." ? (
+              <span key={`ellipsis-${i}`} className="flex size-8 items-center justify-center text-sm text-muted-foreground">
+                …
+              </span>
+            ) : (
+              <Button
+                key={p}
+                variant={p === page ? "outline" : "ghost"}
+                size="icon"
+                className="size-8"
+                onClick={() => onPageChange(p as number)}
+                disabled={disabled}
+                aria-label={`Page ${p}`}
+                aria-current={p === page ? "page" : undefined}
+              >
+                {p}
+              </Button>
+            ),
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= totalPages || disabled}
+            aria-label="Next page"
+          >
+            <ChevronRightIcon className="size-4" />
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -272,15 +383,22 @@ function CompensationRow({
 // ---------------------------------------------------------------------------
 
 export function EmployeeCompensation({ employeeId }: { employeeId: string }) {
+  const [page, setPage] = useState(1);
   const { data, isPending, isError, error, refetch } =
-    useCompensationRecords(employeeId);
+    useCompensationRecords(employeeId, page);
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
+    <>
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>
           <h2>Compensation history</h2>
         </CardTitle>
+        <Button size="sm" onClick={() => setAddOpen(true)}>
+          <PlusIcon aria-hidden="true" />
+          Add record
+        </Button>
       </CardHeader>
       <CardContent className="p-0">
         {isPending ? (
@@ -326,14 +444,23 @@ export function EmployeeCompensation({ employeeId }: { employeeId: string }) {
                 ))}
               </TableBody>
             </Table>
-            {data.meta.total > data.meta.pageSize && (
-              <p className="border-t p-4 text-center text-sm text-muted-foreground">
-                Showing {data.data.length} of {data.meta.total} records.
-              </p>
-            )}
+            <CompensationPagination
+              page={data.meta.page}
+              totalPages={data.meta.totalPages}
+              total={data.meta.total}
+              pageSize={COMPENSATION_PAGE_SIZE}
+              onPageChange={setPage}
+            />
           </>
         )}
       </CardContent>
     </Card>
+    <AddCompensationDialog
+      employeeId={employeeId}
+      open={addOpen}
+      onOpenChange={setAddOpen}
+      onSuccess={() => setPage(1)}
+    />
+    </>
   );
 }

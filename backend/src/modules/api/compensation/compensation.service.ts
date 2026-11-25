@@ -17,6 +17,7 @@ import {
 } from './dto/compensation-response.dto';
 import { CreateCompensationDto } from './dto/create-compensation.dto';
 import { ListCompensationQueryDto } from './dto/list-compensation-query.dto';
+import { UpdateCompensationDto } from './dto/update-compensation.dto';
 
 /** Parses a YYYY-MM-DD (or ISO 8601) string to a Date at midnight UTC. */
 function parseDate(dateStr: string): Date {
@@ -62,9 +63,7 @@ export class CompensationService {
             ],
           },
           // only add start-of-existing check when new record has an end date
-          ...(effectiveTo
-            ? [{ effectiveFrom: { lte: effectiveTo } }]
-            : []),
+          ...(effectiveTo ? [{ effectiveFrom: { lte: effectiveTo } }] : []),
         ],
       },
     });
@@ -83,7 +82,9 @@ export class CompensationService {
           employeeId,
           amount: dto.amount,
           currencyCode: dto.currencyCode,
-          ...(dto.payFrequency !== undefined && { payFrequency: dto.payFrequency }),
+          ...(dto.payFrequency !== undefined && {
+            payFrequency: dto.payFrequency,
+          }),
           ...(dto.type !== undefined && { type: dto.type }),
           changeReason: dto.changeReason ?? null,
           effectiveFrom,
@@ -96,9 +97,13 @@ export class CompensationService {
           compensationRecordId: record.id,
           changedById: changedBy,
           beforeValue: previous
-            ? (toCompensationSnapshot(previous) as unknown as Prisma.InputJsonValue)
+            ? (toCompensationSnapshot(
+                previous,
+              ) as unknown as Prisma.InputJsonValue)
             : Prisma.JsonNull,
-          afterValue: toCompensationSnapshot(record) as unknown as Prisma.InputJsonValue,
+          afterValue: toCompensationSnapshot(
+            record,
+          ) as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -136,6 +141,68 @@ export class CompensationService {
     };
   }
 
+  async update(
+    employeeId: string,
+    recordId: string,
+    dto: UpdateCompensationDto,
+    changedBy: string,
+  ): Promise<CompensationResponse> {
+    await this.requireEmployee(employeeId);
+
+    const record = await this.prisma.compensationRecord.findFirst({
+      where: { id: recordId, employeeId },
+    });
+    if (!record) {
+      throw new NotFoundException(COMPENSATION_MESSAGES.notFound);
+    }
+
+    const effectiveTo =
+      dto.effectiveTo != null ? parseDate(dto.effectiveTo) : null;
+
+    if (effectiveTo && effectiveTo < record.effectiveFrom) {
+      throw new BadRequestException(COMPENSATION_MESSAGES.endBeforeStart);
+    }
+
+    // Check no other record overlaps with the updated [effectiveFrom, effectiveTo].
+    const overlap = await this.prisma.compensationRecord.findFirst({
+      where: {
+        employeeId,
+        id: { not: recordId },
+        AND: [
+          {
+            OR: [
+              { effectiveTo: null },
+              { effectiveTo: { gte: record.effectiveFrom } },
+            ],
+          },
+          ...(effectiveTo ? [{ effectiveFrom: { lte: effectiveTo } }] : []),
+        ],
+      },
+    });
+    if (overlap) {
+      throw new ConflictException(COMPENSATION_MESSAGES.overlap);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const before = toCompensationSnapshot(record);
+      const updated = await tx.compensationRecord.update({
+        where: { id: recordId },
+        data: { effectiveTo },
+      });
+      await tx.auditLog.create({
+        data: {
+          compensationRecordId: recordId,
+          changedById: changedBy,
+          beforeValue: before as unknown as Prisma.InputJsonValue,
+          afterValue: toCompensationSnapshot(
+            updated,
+          ) as unknown as Prisma.InputJsonValue,
+        },
+      });
+      return toCompensationResponse(updated);
+    });
+  }
+
   async findCurrent(employeeId: string): Promise<CompensationResponse> {
     await this.requireEmployee(employeeId);
 
@@ -171,19 +238,23 @@ export class CompensationService {
   ): Promise<AuditLogResponse> {
     await this.requireEmployee(employeeId);
 
-    const record = await this.prisma.compensationRecord.findFirst({
+    const exists = await this.prisma.compensationRecord.findFirst({
       where: { id: recordId, employeeId },
-      include: { auditLog: true },
+      select: { id: true },
     });
-
-    if (!record) {
+    if (!exists) {
       throw new NotFoundException(COMPENSATION_MESSAGES.notFound);
     }
-    if (!record.auditLog) {
+
+    const log = await this.prisma.auditLog.findFirst({
+      where: { compensationRecordId: recordId },
+      orderBy: { changedAt: 'desc' },
+    });
+    if (!log) {
       throw new NotFoundException(COMPENSATION_MESSAGES.auditNotFound);
     }
 
-    return toAuditLogResponse(record.auditLog);
+    return toAuditLogResponse(log);
   }
 
   /** Throws 404 if the employee does not exist (active or deleted). */

@@ -8,18 +8,28 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
+export const COMPENSATION_PAGE_SIZE = 5;
+
 import {
+  createCompensationRecord,
   createEmployee,
   deleteEmployee,
   getCompensationAuditLog,
+  getCurrencies,
   getEmployee,
   getEmployeeOptions,
   listCompensationRecords,
   listEmployees,
+  updateCompensationRecord,
   updateEmployee,
 } from "./api";
 import { SCROLL_PAGE_SIZE } from "./list-params";
-import type { EmployeeListFilters, UpdateEmployeePayload } from "./types";
+import type {
+  CreateCompensationPayload,
+  EmployeeListFilters,
+  UpdateCompensationPayload,
+  UpdateEmployeePayload,
+} from "./types";
 
 export const employeeKeys = {
   all: ["employees"] as const,
@@ -103,15 +113,17 @@ export function useDeleteEmployee() {
 
 export const compensationKeys = {
   all: (employeeId: string) => ["compensation", employeeId] as const,
-  list: (employeeId: string) => [...compensationKeys.all(employeeId), "list"] as const,
+  lists: (employeeId: string) => [...compensationKeys.all(employeeId), "list"] as const,
+  list: (employeeId: string, page: number) => [...compensationKeys.lists(employeeId), page] as const,
   audit: (employeeId: string, recordId: string) =>
     [...compensationKeys.all(employeeId), "audit", recordId] as const,
 };
 
-export function useCompensationRecords(employeeId: string) {
+export function useCompensationRecords(employeeId: string, page = 1) {
   return useQuery({
-    queryKey: compensationKeys.list(employeeId),
-    queryFn: () => listCompensationRecords(employeeId),
+    queryKey: compensationKeys.list(employeeId, page),
+    queryFn: () => listCompensationRecords(employeeId, page, COMPENSATION_PAGE_SIZE),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -119,5 +131,44 @@ export function useCompensationAuditLog(employeeId: string, recordId: string) {
   return useQuery({
     queryKey: compensationKeys.audit(employeeId, recordId),
     queryFn: () => getCompensationAuditLog(employeeId, recordId),
+  });
+}
+
+export function useCurrencies() {
+  return useQuery({
+    queryKey: ["currencies"],
+    queryFn: getCurrencies,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+}
+
+export function useUpdateCompensationRecord(employeeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      recordId,
+      payload,
+    }: {
+      recordId: string;
+      payload: UpdateCompensationPayload;
+    }) => updateCompensationRecord(employeeId, recordId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: compensationKeys.lists(employeeId),
+      });
+    },
+  });
+}
+
+export function useCreateCompensationRecord(employeeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateCompensationPayload) =>
+      createCompensationRecord(employeeId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: compensationKeys.lists(employeeId),
+      });
+    },
   });
 }

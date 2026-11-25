@@ -154,7 +154,7 @@ model CompensationRecord {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  auditLog AuditLog?
+  auditLogs AuditLog[]
 
   @@index([employeeId, effectiveFrom])
   @@index([employeeId, effectiveTo])
@@ -166,7 +166,7 @@ model CompensationRecord {
 /// CompensationRecord; never updated or deleted.
 model AuditLog {
   id                   String             @id @default(cuid())
-  compensationRecordId String             @unique @map("compensation_record_id")
+  compensationRecordId String             @map("compensation_record_id")
   compensationRecord   CompensationRecord @relation(fields: [compensationRecordId], references: [id])
 
   /// ID of the User who recorded the salary change.

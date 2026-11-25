@@ -3,12 +3,16 @@ import { toQueryString } from "@/lib/search-params";
 
 import type {
   AuditLogEntry,
+  CompensationRecord,
+  CreateCompensationPayload,
   CreateEmployeePayload,
+  CurrencyOption,
   Employee,
   EmployeeListFilters,
   EmployeeListResponse,
   EmployeeOptions,
   PaginatedCompensation,
+  UpdateCompensationPayload,
   UpdateEmployeePayload,
 } from "./types";
 
@@ -73,5 +77,30 @@ export function getCompensationAuditLog(
 ): Promise<AuditLogEntry> {
   return apiRequest<AuditLogEntry>(
     `/employees/${encodeURIComponent(employeeId)}/compensation/${encodeURIComponent(recordId)}/audit`,
+  );
+}
+
+export function getCurrencies(): Promise<CurrencyOption[]> {
+  return apiRequest<CurrencyOption[]>("/currencies");
+}
+
+export function createCompensationRecord(
+  employeeId: string,
+  payload: CreateCompensationPayload,
+): Promise<CompensationRecord> {
+  return apiRequest<CompensationRecord>(
+    `/employees/${encodeURIComponent(employeeId)}/compensation`,
+    { method: "POST", body: payload },
+  );
+}
+
+export function updateCompensationRecord(
+  employeeId: string,
+  recordId: string,
+  payload: UpdateCompensationPayload,
+): Promise<CompensationRecord> {
+  return apiRequest<CompensationRecord>(
+    `/employees/${encodeURIComponent(employeeId)}/compensation/${encodeURIComponent(recordId)}`,
+    { method: "PATCH", body: payload },
   );
 }

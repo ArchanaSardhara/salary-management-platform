@@ -117,6 +117,25 @@ export interface PaginatedCompensation {
   meta: { page: number; pageSize: number; total: number; totalPages: number };
 }
 
+export interface CurrencyOption {
+  code: string;
+  label: string;
+}
+
+export interface CreateCompensationPayload {
+  amount: number;
+  currencyCode: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  payFrequency?: PayFrequency;
+  type?: CompensationType;
+  changeReason?: string;
+}
+
+export interface UpdateCompensationPayload {
+  effectiveTo: string | null;
+}
+
 // ---------------------------------------------------------------------------
 
 export interface EmployeeFormPayload {

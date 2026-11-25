@@ -1008,3 +1008,304 @@ Build the frontend Login (`/login`), Register (`/register`), Forgot Password (`/
 - `requirements.md` lists "server-side … pagination"; that is still how the API works, but the UI no longer shows page numbers or a page size. Confirm this replaces the pagination UI requested in #12.
 
 [human note: ]
+
+---
+
+## 14. Database seeding and UI polish: seed script, password toggle, sticky header, "All" filter options
+
+**Date:** 2026-11-25
+
+### What was asked
+
+Multiple small tasks in one session:
+1. Add a database seed file.
+2. Update seed to avoid deleting users on re-seed.
+3. Add password show/hide toggle on login and register forms.
+4. Fix sticky table header (not sticking).
+5. Add "All countries / All departments / All statuses" options to multi-select filters.
+
+### What AI generated
+
+**Seed file (`backend/prisma/seed.ts`):**
+- Seeds two users (admin + hr), 20 employees, and compensation records with audit logs.
+- On re-seed: deletes only `audit_logs`, `compensation_records`, and `employees`; uses `upsert` for both seed users so they are preserved if they already exist.
+- `package.json` wired with `prisma.seed` config and a `db:seed` npm script.
+
+**Password toggle (`frontend/src/features/auth/components/login-form.tsx`, `register-form.tsx`):**
+- `showPassword` state; `EyeIcon`/`EyeOffIcon` from lucide-react inside an `InputGroup`/`InputGroupButton`; toggles `type="password"` ↔ `type="text"`.
+- Applied to the password field on login; the "Password" field only on register (`confirmPassword` left as plain password input).
+
+**Sticky table header (`frontend/src/components/ui/table.tsx`, `frontend/src/features/employees/components/employees-table.tsx`):**
+- Root cause: `overflow-x: hidden` on the table wrapper creates a scroll context that breaks `position: sticky`.
+- Fix 1 — `table.tsx`: `containerClassName` now *replaces* (not merges with) the default `"relative w-full overflow-x-auto"` so callers can remove overflow.
+- Fix 2 — `employees-table.tsx`: passes `containerClassName="relative w-full"` (no overflow) and applies `sticky top-0 z-10 bg-secondary` on each `<th>` individually (more cross-browser than on `<thead>`).
+- Note: `cn` in this project is clsx only (v0.5.2), not tailwind-merge, so conflicting classes cannot be resolved by merging — the replace approach is the correct fix.
+
+**"All" filter options (`frontend/src/components/multi-select-filter.tsx`):**
+- Added `ALL_VALUE = ""` sentinel item at the top of each dropdown, labelled "All countries" / "All departments" / "All statuses".
+- Clicking the sentinel when others are selected clears all selections; selecting any real value removes the sentinel. When nothing is selected, the sentinel appears checked.
+
+### Files created or modified
+
+- `backend/prisma/seed.ts` (created)
+- `backend/package.json` (prisma.seed config + db:seed script)
+- `frontend/src/features/auth/components/login-form.tsx`
+- `frontend/src/features/auth/components/register-form.tsx`
+- `frontend/src/components/ui/table.tsx`
+- `frontend/src/features/employees/components/employees-table.tsx`
+- `frontend/src/components/multi-select-filter.tsx`
+
+### Technical decisions
+
+- `ALL_VALUE = ""` is safe as a sentinel because real option values (country codes, department names, status strings) are never empty strings.
+- Sticky on individual `<th>` rather than `<thead>` avoids browser inconsistencies.
+
+### Tests executed
+
+- Not re-run; previous suite (88/88) covered multi-select logic. Visual sticky-header fix not covered by automated tests.
+
+[human note: ]
+
+---
+
+## 15. Backend and frontend column sorting for the employee directory
+
+**Date:** 2026-11-25
+
+### What was asked
+
+> "Add sorting for columns."
+
+### What AI generated
+
+**Backend (`backend/src/modules/api/employees/`):**
+- `ListEmployeesQueryDto`: added optional `sortBy` and `sortOrder` with class-validator decorators.
+- `employees.service.ts` `findAll`: builds an `orderBy` array with a stable `employeeNumber` tiebreaker.
+
+**Frontend:**
+- `types.ts`: `EMPLOYEE_SORT_FIELDS`, `EmployeeSortField`, `SortOrder`; `sortBy`/`sortOrder` added to `EmployeeListFilters`.
+- `list-params.ts`: `DEFAULT_SORT_FIELD`, `DEFAULT_SORT_ORDER`; URL params `sort` and `order`; default sort omitted from URL.
+- `api.ts`: `sortBy`/`sortOrder` forwarded to the query string.
+- `employees-table.tsx`: `ColumnDef` with optional `sortField`; `SortIcon` (ArrowUpDown/ArrowUp/ArrowDown); `aria-sort` on each `<TableHead>`.
+- `employee-directory.tsx`: `handleSort` — new column → asc; same + asc → desc; same + desc → reset to default.
+
+### Files modified
+
+- `backend/src/modules/api/employees/dto/list-employees-query.dto.ts`
+- `backend/src/modules/api/employees/employees.service.ts`
+- `frontend/src/features/employees/types.ts`
+- `frontend/src/features/employees/list-params.ts`
+- `frontend/src/features/employees/api.ts`
+- `frontend/src/features/employees/components/employees-table.tsx`
+- `frontend/src/features/employees/components/employee-directory.tsx`
+
+### Technical decisions
+
+- Backend appends `{ employeeNumber: 'asc' }` tiebreaker for stable pagination.
+- TanStack Query `queryKey` includes full `filters`, so sort params trigger re-fetches automatically.
+
+### Tests executed
+
+- Not re-run in this session. No new tests written.
+
+[human note: ]
+
+---
+
+## 16. Compensation history and audit log view on the employee profile
+
+**Date:** 2026-11-25
+
+### What was asked
+
+> "Now create compensation and audit log view for employee."
+
+### What AI generated
+
+**Frontend types / API / hooks:**
+- `types.ts`: `PayFrequency`, `CompensationType`, `CompensationRecord`, `CompensationSnapshot`, `AuditLogEntry`, `PaginatedCompensation`.
+- `api.ts`: `listCompensationRecords`, `getCompensationAuditLog`.
+- `hooks.ts`: `compensationKeys`, `useCompensationRecords`, `useCompensationAuditLog`.
+
+**`employee-compensation.tsx` (new):**
+- `CompTypeBadge` (color-coded per type), `SnapshotCard`, `AuditLogPanel` (lazy-fetched on row expand), `CompensationRow` (expandable with "Changes" button), `EmployeeCompensation` (card with full loading/error/empty states).
+- Wired into `employee-profile.tsx` below the employee details card.
+
+### Files created or modified
+
+- `frontend/src/features/employees/types.ts`
+- `frontend/src/features/employees/api.ts`
+- `frontend/src/features/employees/hooks.ts`
+- `frontend/src/features/employees/components/employee-compensation.tsx` (created)
+- `frontend/src/features/employees/components/employee-profile.tsx`
+
+### Tests executed
+
+- No new tests. Backend compensation API tests from entry #8 remain in place.
+
+[human note: ]
+
+---
+
+## 17. Salary update module: add compensation record form
+
+**Date:** 2026-11-25
+
+### What was asked
+
+> "Add salary update module for employee."
+
+### What AI generated
+
+**New types (`types.ts`):** `CurrencyOption`, `CreateCompensationPayload`.
+
+**New API functions (`api.ts`):**
+- `getCurrencies()` → `GET /currencies` (public, ISO 4217 list).
+- `createCompensationRecord(employeeId, payload)` → `POST /employees/:id/compensation`.
+
+**New hooks (`hooks.ts`):**
+- `useCurrencies()` — staleTime 24 h.
+- `useCreateCompensationRecord(employeeId)` — invalidates the compensation list on success.
+
+**New schema (`compensation-schemas.ts`):**
+- `compensationFormSchema`: amount (positive number, ≤ 2 dp, ≤ 10 M), currencyCode, type, payFrequency (all required), effectiveFrom (required ISO date), effectiveTo (optional, must not precede effectiveFrom), changeReason (optional).
+- `formValuesToCompensationPayload`: converts strings to typed API payload.
+
+**New dialog (`add-compensation-dialog.tsx`):**
+- `sm:max-w-lg` base-ui Dialog; 2-column grid layout (Amount + Currency, Type + Pay frequency, Effective from + Effective to, full-width Change reason).
+- react-hook-form + zodResolver; `Controller` for selects; inline `FormAlert` on API error; success toast then close + reset.
+
+**Updated `employee-compensation.tsx`:** "Add record" button in `CardHeader`; `addOpen` state drives the dialog.
+
+### Files created or modified
+
+- `frontend/src/features/employees/types.ts`
+- `frontend/src/features/employees/api.ts`
+- `frontend/src/features/employees/hooks.ts`
+- `frontend/src/features/employees/compensation-schemas.ts` (created)
+- `frontend/src/features/employees/components/add-compensation-dialog.tsx` (created)
+- `frontend/src/features/employees/components/employee-compensation.tsx`
+
+### Technical decisions
+
+- `z.string()` throughout the form (matching the employee form pattern); convert to `number` only in `formValuesToCompensationPayload`.
+- type and payFrequency required in the form even though the backend accepts them as optional.
+- Form wraps the `DialogFooter` so the submit button is inside the `<form>` element (SubmitButton does not forward a `form` attribute prop).
+
+### Tests executed
+
+- TypeScript: zero errors confirmed via VS Code diagnostics across all modified files.
+- Automated suite not re-run. No new test files written.
+- Not verified in a browser.
+
+### Outstanding
+
+- A combobox with search for the currency field would improve UX (200+ options in a plain select).
+- Backend 409 Conflict on date overlap will surface via the inline `FormAlert`.
+- Tests for `compensation-schemas.ts` and `add-compensation-dialog.tsx` are not yet written.
+
+[human note: ]
+
+---
+
+## 18. Compensation history pagination: 5 records per page with numbered page navigation
+
+**Date:** 2026-11-25
+
+### What was asked
+
+> "Make 5 records per page for Compensation history and add pagination UI and required backend. So in UI there will be two types of table with scroll pagination and list pagination."
+
+### What AI generated
+
+**Backend:** No changes required — `GET /employees/:id/compensation` already accepts `page` and `pageSize` query params (from `ListCompensationQueryDto`; default was 20, frontend now explicitly requests `pageSize=5`).
+
+**`hooks.ts`:**
+- Exported `COMPENSATION_PAGE_SIZE = 5` constant.
+- Restructured `compensationKeys`: added `lists(employeeId)` (prefix key for all pages) and changed `list(employeeId, page)` to include the page number.
+- `useCompensationRecords(employeeId, page = 1)`: accepts a `page` argument, passes `pageSize=5` to the API, uses `placeholderData: keepPreviousData` to avoid table flicker during page transitions.
+- `useCreateCompensationRecord`: now invalidates `compensationKeys.lists(employeeId)` (prefix) so all cached pages for that employee are cleared on a new record.
+
+**`add-compensation-dialog.tsx`:**
+- Added optional `onSuccess?: () => void` prop, called after a record is successfully saved (before `handleClose`), so the parent can reset its page counter to 1.
+
+**`employee-compensation.tsx`:**
+- Added `page` state (default 1).
+- Passes `page` to `useCompensationRecords`.
+- Replaced the "Showing X of Y" footer with a `CompensationPagination` component:
+  - Shows "start–end of total" count on the left.
+  - Prev/Next icon buttons + numbered page buttons on the right.
+  - Ellipsis collapses distant pages (shows first, last, current±1); all pages shown when total ≤ 7.
+  - Prev disabled on page 1; Next disabled on last page.
+  - `aria-current="page"` on the active page button.
+- Passes `onSuccess={() => setPage(1)}` to the dialog so a newly added record always lands visible on page 1.
+- Added `ChevronLeftIcon` to imports.
+
+### Files modified
+
+- `frontend/src/features/employees/hooks.ts`
+- `frontend/src/features/employees/components/add-compensation-dialog.tsx`
+- `frontend/src/features/employees/components/employee-compensation.tsx`
+
+### Technical decisions
+
+- Two distinct pagination UIs: the employee directory uses infinite scroll (IntersectionObserver + `useInfiniteQuery`, entry #13), while the compensation history uses numbered page navigation (`useQuery` with an explicit `page` param). Intentionally different — a directory of hundreds benefits from scroll-to-load; an audit trail benefits from discrete, referenceable pages.
+- `keepPreviousData` keeps the current page visible while the next page loads, preventing a blank flash.
+- Query key includes `page`, so each page is cached independently — navigating back and forth is instant.
+- `COMPENSATION_PAGE_SIZE` is a named constant exported from `hooks.ts`; changing it in one place updates both the API request and the pagination display math.
+
+### Tests executed
+
+- TypeScript: zero errors confirmed via VS Code diagnostics.
+- Automated suite not re-run. Not verified in a browser.
+
+[human note: ]
+
+---
+
+## 19. Edit end date on compensation records
+
+**Date:** 2026-11-25
+
+### What was asked
+
+> "Add way to edit end date to ongoing compensation."
+
+### What AI generated
+
+**Backend:**
+- `dto/update-compensation.dto.ts` (new): `UpdateCompensationDto` with an optional nullable `effectiveTo` field (`@IsOptional` + `@ValidateIf` so `null` passes but a non-date string fails).
+- `compensation.service.ts`: new `update()` method — fetches the record, validates end date ≥ start date, runs an overlap check against other records (excluding the one being edited), then wraps update + audit log creation in a transaction.
+- `compensation.controller.ts`: `PATCH /employees/:employeeId/compensation/:recordId` route calling `service.update()`. Registered before `GET :recordId` to avoid routing conflicts.
+
+**Frontend:**
+- `types.ts`: `UpdateCompensationPayload { effectiveTo: string | null }`.
+- `api.ts`: `updateCompensationRecord(employeeId, recordId, payload)` → `PATCH`.
+- `hooks.ts`: `useUpdateCompensationRecord(employeeId)` — invalidates `compensationKeys.lists(employeeId)` on success.
+- `edit-end-date-dialog.tsx` (new): small `sm:max-w-sm` Dialog with a single date input pre-filled with the record's current end date. Leave empty → saves `null` (ongoing). Shows a "Clear — set as ongoing" text button when the record currently has an end date. Syncs with the record prop on open via `useEffect + reset`.
+- `employee-compensation.tsx`: added `PencilIcon` button in the last table column beside the "Changes" toggle; local `editOpen` state per row; renders `EditEndDateDialog` inside the row fragment.
+
+### Files created or modified
+
+- `backend/src/modules/api/compensation/dto/update-compensation.dto.ts` (created)
+- `backend/src/modules/api/compensation/compensation.service.ts`
+- `backend/src/modules/api/compensation/compensation.controller.ts`
+- `frontend/src/features/employees/types.ts`
+- `frontend/src/features/employees/api.ts`
+- `frontend/src/features/employees/hooks.ts`
+- `frontend/src/features/employees/components/edit-end-date-dialog.tsx` (created)
+- `frontend/src/features/employees/components/employee-compensation.tsx`
+
+### Technical decisions
+
+- Scope: only `effectiveTo` is editable via this endpoint. Amount, currency, type, frequency, and start date changes require a new compensation record (preserving the full history / audit trail).
+- `null` payload clears the end date, reverting a record to "ongoing". The overlap check handles this: clearing to null is blocked if another ongoing or later-starting record already exists.
+- The edit button appears on all rows (not just ongoing ones) — users may also need to correct an existing end date.
+- Audit log entry created for every update: the before/after snapshots capture the change clearly.
+
+### Tests executed
+
+- TypeScript: zero errors confirmed via VS Code diagnostics.
+- Automated suite not re-run. Not verified in a browser.
+
+[human note: Run migration on DB and verified working flow]

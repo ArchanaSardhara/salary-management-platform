@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   Request,
@@ -18,6 +19,7 @@ import type { AuthenticatedUser } from '../../../common/authorization/authentica
 import { CompensationService } from './compensation.service';
 import { CreateCompensationDto } from './dto/create-compensation.dto';
 import { ListCompensationQueryDto } from './dto/list-compensation-query.dto';
+import { UpdateCompensationDto } from './dto/update-compensation.dto';
 
 @Controller('employees/:employeeId/compensation')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -41,6 +43,16 @@ export class CompensationController {
     @Query() query: ListCompensationQueryDto,
   ) {
     return this.compensationService.findAll(employeeId, query);
+  }
+
+  @Patch(':recordId')
+  updateEndDate(
+    @Param('employeeId') employeeId: string,
+    @Param('recordId') recordId: string,
+    @Body() dto: UpdateCompensationDto,
+    @Request() req: { user: AuthenticatedUser },
+  ) {
+    return this.compensationService.update(employeeId, recordId, dto, req.user.id);
   }
 
   /** Must be registered before :recordId so NestJS matches 'current' first. */
