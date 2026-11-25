@@ -10,6 +10,7 @@ import { AuthModule } from './modules/api/auth/auth.module';
 import { UsersModule } from './modules/api/users/users.module';
 import { EmployeesModule } from './modules/api/employees/employees.module';
 import { CompensationModule } from './modules/api/compensation/compensation.module';
+import { DashboardModule } from './modules/api/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CompensationModule } from './modules/api/compensation/compensation.modu
     UsersModule,
     EmployeesModule,
     CompensationModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

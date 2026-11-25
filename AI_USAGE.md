@@ -1309,3 +1309,52 @@ Multiple small tasks in one session:
 - Automated suite not re-run. Not verified in a browser.
 
 [human note: Run migration on DB and verified working flow]
+
+---
+
+## 20. Dashboard backend APIs (F6)
+
+**Date:** 2026-11-25
+
+### What was asked
+
+> "Make backend apis" (for the interactive dashboard feature list agreed in the prior turn).
+
+### What AI generated
+
+**New module: `backend/src/modules/api/dashboard/`**
+
+- `dto/dashboard-query.dto.ts`: `DashboardCurrencyQueryDto` (optional `currency`, validated against ISO 4217 list, uppercased via `@Transform`); `DashboardLimitQueryDto` (optional `limit`, default 10, max 100).
+- `dto/dashboard-response.dto.ts`: typed interfaces for all 7 endpoint responses — `DashboardStatsResponse`, `PayrollGroupItem`, `CompensationTypeBreakdownResponse`, `HeadcountTrendResponse`, `RecentChangeItem`, `EmployeeWithoutCompensationItem`.
+- `dashboard.service.ts`: 7 methods — `getStats`, `getPayrollByDepartment`, `getPayrollByCountry`, `getCompensationTypeBreakdown`, `getHeadcountTrend`, `getRecentChanges`, `getEmployeesWithoutCompensation`. Simple counts use Prisma ORM; cross-table aggregations use `$queryRaw` with parameterized template literals.
+- `dashboard.controller.ts`: 7 `GET` routes under `/dashboard/*`, all guarded with `JwtAuthGuard + RolesGuard + @Roles(HR_MANAGER)`.
+- `dashboard.module.ts`: module with no extra imports (PrismaModule is `@Global()`).
+- `app.module.ts`: `DashboardModule` registered.
+
+### Endpoints
+
+| Route | Description |
+|---|---|
+| `GET /dashboard/stats` | Active employees, new hires this month, no-compensation count, records this month |
+| `GET /dashboard/payroll-by-department?currency=` | Per-dept payroll: count, min, max, avg, total |
+| `GET /dashboard/payroll-by-country?currency=` | Same breakdown by country code |
+| `GET /dashboard/compensation-type-breakdown` | Count of active records per CompensationType |
+| `GET /dashboard/headcount-trend` | Active + new-hire count per month, last 12 months |
+| `GET /dashboard/recent-changes?limit=` | Latest audit log entries with employee info |
+| `GET /dashboard/employees-without-compensation?limit=` | Active employees with no open-ended comp record |
+
+### Technical decisions
+
+- Currency is never mixed across rows — payroll endpoints require a single currency code per request (default `USD` when omitted). This enforces the requirements rule: "figures in different currencies are never added or averaged together."
+- Headcount trend uses PostgreSQL `generate_series` + `FILTER (WHERE ...)` aggregation to compute active and new-hire counts per month in a single query.
+- `$queryRaw` with Prisma tagged template literals: all interpolated values become `$1`, `$2`… bind parameters — no SQL injection risk.
+- Decimal amounts are cast to `::text` in SQL to preserve full precision; never converted to float.
+- `bigint` counts from raw queries are converted to JS `number` with `Number()`.
+
+### Tests executed
+
+- `npx tsc --noEmit`: clean (one fix: `Transform` moved from `class-validator` to `class-transformer`).
+- Backend started successfully — NestJS bootstrapped all modules before hitting the already-running port 4000, confirming no DI or module errors.
+- Automated tests not re-run. Endpoints not yet verified against live data.
+
+[human note: ]
