@@ -23,11 +23,12 @@ import { UpdateCompensationDto } from './dto/update-compensation.dto';
 
 @Controller('employees/:employeeId/compensation')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.HR_MANAGER)
+@Roles(Role.HR_MANAGER, Role.ADMIN)
 export class CompensationController {
   constructor(private readonly compensationService: CompensationService) {}
 
   @Post()
+  @Roles(Role.HR_MANAGER)
   @HttpCode(HttpStatus.CREATED)
   create(
     @Param('employeeId') employeeId: string,
@@ -46,6 +47,7 @@ export class CompensationController {
   }
 
   @Patch(':recordId')
+  @Roles(Role.HR_MANAGER)
   updateEndDate(
     @Param('employeeId') employeeId: string,
     @Param('recordId') recordId: string,

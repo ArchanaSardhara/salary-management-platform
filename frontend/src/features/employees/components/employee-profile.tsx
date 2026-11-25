@@ -24,7 +24,7 @@ import { EmployeeCompensation } from "./employee-compensation";
 import { EmployeeNotFound, isNotFoundError } from "./employee-not-found";
 import { EmployeeStatusBadge } from "./employee-status-badge";
 
-export function EmployeeProfile({ id }: { id: string }) {
+export function EmployeeProfile({ id, readOnly }: { id: string; readOnly?: boolean }) {
   const employee = useEmployee(id);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
     null,
@@ -101,7 +101,7 @@ export function EmployeeProfile({ id }: { id: string }) {
         title={getFullName(data)}
         description={`${data.jobTitle} · ${data.department}`}
         actions={
-          isDeleted ? null : (
+          isDeleted || readOnly ? null : (
             <>
               <Link
                 href={EMPLOYEE_ROUTES.edit(data.id)}
@@ -143,7 +143,7 @@ export function EmployeeProfile({ id }: { id: string }) {
         </CardContent>
       </Card>
 
-      <EmployeeCompensation employeeId={data.id} />
+      <EmployeeCompensation employeeId={data.id} readOnly={readOnly} />
 
       <DeleteEmployeeDialog
         employee={employeeToDelete}

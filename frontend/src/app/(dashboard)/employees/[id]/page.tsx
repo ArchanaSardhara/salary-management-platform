@@ -19,6 +19,6 @@ export default function EmployeePage({ params }: PageProps<"/employees/[id]">) {
 }
 
 async function AuthorizedProfile({ params }: { params: Promise<{ id: string }> }) {
-  const [{ id }] = await Promise.all([params, requireRole(EMPLOYEE_PAGE_ROLES)]);
-  return <EmployeeProfile id={id} />;
+  const [{ id }, user] = await Promise.all([params, requireRole(EMPLOYEE_PAGE_ROLES)]);
+  return <EmployeeProfile id={id} readOnly={user.role === "ADMIN"} />;
 }

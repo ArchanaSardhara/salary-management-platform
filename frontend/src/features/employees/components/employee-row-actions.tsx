@@ -19,9 +19,10 @@ import type { Employee } from "../types";
 interface EmployeeRowActionsProps {
   employee: Employee;
   onDelete: (employee: Employee) => void;
+  readOnly?: boolean;
 }
 
-export function EmployeeRowActions({ employee, onDelete }: EmployeeRowActionsProps) {
+export function EmployeeRowActions({ employee, onDelete, readOnly }: EmployeeRowActionsProps) {
   const isDeleted = employee.status === "DELETED";
 
   return (
@@ -42,23 +43,27 @@ export function EmployeeRowActions({ employee, onDelete }: EmployeeRowActionsPro
           <EyeIcon aria-hidden="true" />
           View employee
         </DropdownMenuItem>
-        {/* Deleted employees must be restored before they can be edited. */}
-        <DropdownMenuItem
-          disabled={isDeleted}
-          render={isDeleted ? undefined : <Link href={EMPLOYEE_ROUTES.edit(employee.id)} />}
-        >
-          <PencilIcon aria-hidden="true" />
-          Edit employee
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          disabled={isDeleted}
-          onClick={() => onDelete(employee)}
-        >
-          <Trash2Icon aria-hidden="true" />
-          Delete employee
-        </DropdownMenuItem>
+        {!readOnly && (
+          <>
+            {/* Deleted employees must be restored before they can be edited. */}
+            <DropdownMenuItem
+              disabled={isDeleted}
+              render={isDeleted ? undefined : <Link href={EMPLOYEE_ROUTES.edit(employee.id)} />}
+            >
+              <PencilIcon aria-hidden="true" />
+              Edit employee
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={isDeleted}
+              onClick={() => onDelete(employee)}
+            >
+              <Trash2Icon aria-hidden="true" />
+              Delete employee
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

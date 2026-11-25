@@ -36,7 +36,7 @@ import { EmployeesTable } from "./employees-table";
  * more employees as the user scrolls. Filters live in the URL, so they
  * survive reloads and can be shared.
  */
-export function EmployeeDirectory() {
+export function EmployeeDirectory({ readOnly }: { readOnly?: boolean }) {
   const { searchParams, setParams } = useSearchParamsState(LIST_PARAM_DEFAULTS);
   const filters = parseEmployeeListFilters(searchParams);
   const hasActiveFilters = getHasActiveFilters(filters);
@@ -113,13 +113,15 @@ export function EmployeeDirectory() {
           )
         }
         actions={
-          <Link
-            href={EMPLOYEE_ROUTES.create}
-            className={buttonVariants({ size: "lg" })}
-          >
-            <PlusIcon aria-hidden="true" />
-            Add employee
-          </Link>
+          readOnly ? null : (
+            <Link
+              href={EMPLOYEE_ROUTES.create}
+              className={buttonVariants({ size: "lg" })}
+            >
+              <PlusIcon aria-hidden="true" />
+              Add employee
+            </Link>
+          )
         }
       />
 
@@ -175,6 +177,7 @@ export function EmployeeDirectory() {
               sortOrder={filters.sortOrder}
               onSort={handleSort}
               tableHeadTop={DASHBOARD_HEADER_H + filterBarH}
+              readOnly={readOnly}
             />
             {!isFirstLoad && total !== undefined ? (
               <EmployeeListFooter

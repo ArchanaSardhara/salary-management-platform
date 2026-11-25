@@ -1,43 +1,19 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Role } from '../../../common/authorization/role.enum';
+import { Roles } from '../../../common/authorization/roles.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../../../common/authorization/roles.guard';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { IUser } from './entities/user.entity';
+import { ListUsersQueryDto } from './dto/list-users-query.dto';
 
-@Controller('user')
+@Controller('users')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
 export class UserController {
   constructor(private readonly userService: UsersService) {}
 
-  // @Post()
-  // create(@Body() createUserDto: CreateUserDto): Promise<IUser> {
-  //   return this.userService.create(createUserDto);
-  // }
-
-  // @Get()
-  // findAll() {
-  //   return this.userService.findAll();
-  // }
-
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.userService.findById(id);
-  // }
-
-  // @Patch(':id')
-  // update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-  //   return this.userService.update(+id, updateUserDto);
-  // }
-
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.userService.remove(+id);
-  // }
+  @Get()
+  listHrManagers(@Query() query: ListUsersQueryDto) {
+    return this.userService.findHrManagers(query.search);
+  }
 }

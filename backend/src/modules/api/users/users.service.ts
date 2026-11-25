@@ -56,8 +56,23 @@ export class UsersService {
     });
   }
 
-  async findAll() {
-    return this.prisma.user.findMany({});
+  async findHrManagers(search?: string) {
+    const where = search
+      ? {
+          role: Role.HR_MANAGER,
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' as const } },
+            { lastName: { contains: search, mode: 'insensitive' as const } },
+            { email: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : { role: Role.HR_MANAGER };
+
+    return this.prisma.user.findMany({
+      where,
+      omit: { passwordHash: true },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
   }
 
   async findById(id: string): Promise<IUser | null> {

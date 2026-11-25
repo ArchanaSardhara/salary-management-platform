@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { requireRole } from "@/features/auth/server/session";
 import { EditEmployeeView } from "@/features/employees/components/edit-employee-view";
 import { EmployeePageSkeleton } from "@/features/employees/components/employee-page-skeleton";
-import { EMPLOYEE_PAGE_ROLES } from "@/features/employees/routes";
+import { EMPLOYEE_WRITE_ROLES } from "@/features/employees/routes";
 
 export const metadata: Metadata = {
   title: "Edit employee",
@@ -19,6 +19,6 @@ export default function EditEmployeePage({ params }: PageProps<"/employees/[id]/
 }
 
 async function AuthorizedEdit({ params }: { params: Promise<{ id: string }> }) {
-  const [{ id }] = await Promise.all([params, requireRole(EMPLOYEE_PAGE_ROLES)]);
+  const [{ id }] = await Promise.all([params, requireRole(EMPLOYEE_WRITE_ROLES)]);
   return <EditEmployeeView id={id} />;
 }

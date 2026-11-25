@@ -219,9 +219,11 @@ const TABLE_COL_COUNT = 6;
 function CompensationRow({
   record,
   employeeId,
+  readOnly,
 }: {
   record: CompensationRecord;
   employeeId: string;
+  readOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -258,16 +260,18 @@ function CompensationRow({
         </TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              onClick={() => setEditOpen(true)}
-              aria-label="Edit end date"
-              title="Edit end date"
-            >
-              <PencilIcon className="size-3.5" aria-hidden="true" />
-            </Button>
+            {!readOnly && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => setEditOpen(true)}
+                aria-label="Edit end date"
+                title="Edit end date"
+              >
+                <PencilIcon className="size-3.5" aria-hidden="true" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -411,7 +415,7 @@ function CompensationPagination({
 // Main export
 // ---------------------------------------------------------------------------
 
-export function EmployeeCompensation({ employeeId }: { employeeId: string }) {
+export function EmployeeCompensation({ employeeId, readOnly }: { employeeId: string; readOnly?: boolean }) {
   const [page, setPage] = useState(1);
   const { data, isPending, isError, error, refetch } = useCompensationRecords(
     employeeId,
@@ -426,10 +430,12 @@ export function EmployeeCompensation({ employeeId }: { employeeId: string }) {
           <CardTitle>
             <h2>Compensation history</h2>
           </CardTitle>
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <PlusIcon aria-hidden="true" />
-            Add record
-          </Button>
+          {!readOnly && (
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <PlusIcon aria-hidden="true" />
+              Add record
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           {isPending ? (
@@ -471,6 +477,7 @@ export function EmployeeCompensation({ employeeId }: { employeeId: string }) {
                       key={record.id}
                       record={record}
                       employeeId={employeeId}
+                      readOnly={readOnly}
                     />
                   ))}
                 </TableBody>
@@ -486,12 +493,14 @@ export function EmployeeCompensation({ employeeId }: { employeeId: string }) {
           )}
         </CardContent>
       </Card>
-      <AddCompensationDialog
-        employeeId={employeeId}
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        onSuccess={() => setPage(1)}
-      />
+      {!readOnly && (
+        <AddCompensationDialog
+          employeeId={employeeId}
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          onSuccess={() => setPage(1)}
+        />
+      )}
     </>
   );
 }

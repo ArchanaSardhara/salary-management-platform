@@ -48,6 +48,7 @@ interface EmployeesTableProps {
   onSort: (field: EmployeeSortField) => void;
   /** `top` offset (px) for the sticky header. */
   tableHeadTop?: number;
+  readOnly?: boolean;
 }
 
 function SortIcon({
@@ -79,6 +80,7 @@ export function EmployeesTable({
   sortOrder,
   onSort,
   tableHeadTop = 56,
+  readOnly,
 }: EmployeesTableProps) {
 
   return (
@@ -191,7 +193,7 @@ export function EmployeesTable({
                     {formatDate(employee.startDate)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <EmployeeRowActions employee={employee} onDelete={onDelete} />
+                    <EmployeeRowActions employee={employee} onDelete={onDelete} readOnly={readOnly} />
                   </TableCell>
                 </TableRow>
               ))}

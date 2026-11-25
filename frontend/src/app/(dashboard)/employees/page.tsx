@@ -19,6 +19,6 @@ export default function EmployeesPage() {
 }
 
 async function AuthorizedDirectory() {
-  await requireRole(EMPLOYEE_PAGE_ROLES);
-  return <EmployeeDirectory />;
+  const user = await requireRole(EMPLOYEE_PAGE_ROLES);
+  return <EmployeeDirectory readOnly={user.role === "ADMIN"} />;
 }

@@ -1434,3 +1434,90 @@ npm install recharts
 ```
 
 [human note: Installed Recharts and implemented the interactive dashboard with reusable chart components, KPI cards, and analytics tables. Separated chart rendering from business logic for better reusability and maintainability.]
+
+---
+
+## 22. Dashboard date filters, currency distribution chart, HR Manager list page, and ADMIN role access (F4, F6)
+
+**Date:** 2026-11-25
+
+### What was asked
+
+1. Add advanced date filters (Last 7D, 1M, 6M, 1Y, custom date range) to the Headcount Trend chart.
+2. Add a Currency Distribution donut chart showing how many employees are paid in each currency (USD, INR, etc.).
+3. Create an HR Manager list page (admin view, read-only - add/update/delete is out of MVP scope).
+4. Allow admin users to view the Employee directory, employee profiles, and dashboard (all read-only).
+
+### What AI generated
+
+**Dashboard date filters (headcount trend):**
+- Backend: added HeadcountTrendQueryDto with optional startDate/endDate; replaced getHeadcountTrend() with a version that accepts date range params and uses dynamic granularity (daily 14 days, weekly 90 days, monthly otherwise) using generate_series raw SQL.
+- Frontend: PeriodControls component with preset buttons (7D, 1M, 6M, 1Y) and a Custom popover with two date inputs and an Apply button. Derives startDate/endDate from preset using daysAgo().
+
+**Currency distribution chart:**
+- Backend: added GET /dashboard/payroll-by-currency endpoint; SQL counts employees per currency code from active compensation records.
+- Frontend: CurrencyDistributionChart component - formats PayrollCurrencyItem[] into DonutSlice[] with percentage legend showing count per currency.
+
+**HR Manager list page:**
+- Backend: GET /users endpoint (ADMIN only); ListUsersQueryDto with optional search; findHrManagers(search?) queries by role = HR_MANAGER with OR filter across firstName, lastName, email.
+- Frontend: HrManager type, listHrManagers() API function, useHrManagers(search) TanStack Query hook; HrManagerList component with debounced search input, table (Name, Email, Status badge, Joined date), empty/error/loading states; app/(dashboard)/hr-managers/page.tsx (ADMIN only via requireRole(["ADMIN"])).
+
+**ADMIN read-only access to employees and dashboard:**
+- Backend: EmployeesController and CompensationController class-level @Roles now include Role.ADMIN; write methods (create, update, softDelete, restore) have an overriding @Roles(Role.HR_MANAGER) to block ADMIN. DashboardController class-level @Roles now includes Role.ADMIN.
+- Frontend: EMPLOYEE_PAGE_ROLES changed to ["HR_MANAGER", "ADMIN"]; new EMPLOYEE_WRITE_ROLES = ["HR_MANAGER"] guards the new/edit pages. readOnly prop propagated from server page -> EmployeeDirectory -> EmployeesTable -> EmployeeRowActions and EmployeeProfile -> EmployeeCompensation -> CompensationRow to hide write actions (Add Employee, Edit Employee, Delete Employee, Add Compensation, Edit End Date) for ADMIN users.
+- Navigation: Employees nav item now includes "ADMIN" role; HR Managers nav item added for "ADMIN" only.
+
+### Files created or modified
+
+**Backend:**
+- backend/src/modules/api/dashboard/dto/dashboard-query.dto.ts (modified - added HeadcountTrendQueryDto)
+- backend/src/modules/api/dashboard/dto/dashboard-response.dto.ts (modified - added PayrollCurrencyItem, replaced HeadcountMonthItem)
+- backend/src/modules/api/dashboard/dashboard.service.ts (modified - added getPayrollByCurrency, rewrote getHeadcountTrend with dynamic granularity)
+- backend/src/modules/api/dashboard/dashboard.controller.ts (modified - added /payroll-by-currency route, changed @Roles to include ADMIN)
+- backend/src/modules/api/employees/employees.controller.ts (modified - class @Roles includes ADMIN; write methods get @Roles(Role.HR_MANAGER) override)
+- backend/src/modules/api/compensation/compensation.controller.ts (modified - class @Roles includes ADMIN; create and updateEndDate get @Roles(Role.HR_MANAGER) override)
+- backend/src/modules/api/users/users.controller.ts (modified - rewritten with GET /users, ADMIN only)
+- backend/src/modules/api/users/users.service.ts (modified - added findHrManagers(search?))
+- backend/src/modules/api/users/dto/list-users-query.dto.ts (created)
+
+**Frontend:**
+- frontend/src/features/dashboard/navigation.ts (modified - added ADMIN to Employees; added HR Managers nav item)
+- frontend/src/features/dashboard/components/headcount-trend-chart.tsx (rewritten - adds preset buttons + custom date range popover)
+- frontend/src/features/dashboard/components/currency-distribution-chart.tsx (created)
+- frontend/src/features/dashboard/components/dashboard-overview.tsx (modified - added CurrencyDistributionChart)
+- frontend/src/features/employees/routes.ts (modified - EMPLOYEE_PAGE_ROLES includes ADMIN; added EMPLOYEE_WRITE_ROLES)
+- frontend/src/features/employees/components/employee-directory.tsx (modified - readOnly prop, hides Add Employee button)
+- frontend/src/features/employees/components/employees-table.tsx (modified - readOnly prop passed to row actions)
+- frontend/src/features/employees/components/employee-row-actions.tsx (modified - readOnly hides Edit/Delete items)
+- frontend/src/features/employees/components/employee-profile.tsx (modified - readOnly prop, hides edit/delete header actions)
+- frontend/src/features/employees/components/employee-compensation.tsx (modified - readOnly prop, hides Add Record and pencil buttons)
+- frontend/src/app/(dashboard)/employees/page.tsx (modified - passes readOnly based on user role)
+- frontend/src/app/(dashboard)/employees/[id]/page.tsx (modified - passes readOnly based on user role)
+- frontend/src/app/(dashboard)/employees/[id]/edit/page.tsx (modified - uses EMPLOYEE_WRITE_ROLES)
+- frontend/src/app/(dashboard)/employees/new/page.tsx (modified - uses EMPLOYEE_WRITE_ROLES)
+- frontend/src/features/hr-managers/types.ts (created)
+- frontend/src/features/hr-managers/api.ts (created)
+- frontend/src/features/hr-managers/hooks.ts (created)
+- frontend/src/features/hr-managers/components/hr-manager-list.tsx (created)
+- frontend/src/app/(dashboard)/hr-managers/page.tsx (created)
+
+### Technical decisions
+
+- Method-level @Roles override: NestJS RolesGuard reads from the method decorator first (via getAllAndOverride). Adding @Roles(Role.HR_MANAGER) on write methods narrows the class-level @Roles(HR_MANAGER, ADMIN) without touching GET routes.
+- readOnly propagation: passed top-down from the server component (which knows the user role) to the leaf interactive components. No context/global state needed for a simple boolean flag on a page-level decision.
+- EMPLOYEE_WRITE_ROLES constant: the new/edit pages use this directly so ADMIN hitting those URLs is immediately redirected, even if they somehow bypassed the missing UI buttons.
+- HR Manager search: debounced at 300ms in the component (no URL state - the list is small, search is ephemeral).
+
+### Tests executed
+
+- TypeScript diagnostics reviewed via IDE (no new errors introduced).
+- Not verified in a browser in this session (dev server not started).
+
+### Outstanding issues / limitations
+
+- Recharts must be installed manually in the frontend: cd frontend && npm install recharts.
+- Backend TypeScript compilation not re-run; run npm run build in backend/ to verify.
+- Role-override behaviour (getAllAndOverride) assumes the existing RolesGuard implementation uses that NestJS helper. Verify this in roles.guard.ts if unexpected 403s appear.
+
+[human note: ]
+

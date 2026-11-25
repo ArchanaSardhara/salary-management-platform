@@ -27,11 +27,12 @@ import { EmployeesService } from './employees.service';
 
 @Controller('employees')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.HR_MANAGER)
+@Roles(Role.HR_MANAGER, Role.ADMIN)
 export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
   @Post()
+  @Roles(Role.HR_MANAGER)
   create(@Body() dto: CreateEmployeeDto): Promise<EmployeeResponse> {
     return this.employeesService.create(dto);
   }
@@ -55,6 +56,7 @@ export class EmployeesController {
   }
 
   @Patch(':id')
+  @Roles(Role.HR_MANAGER)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateEmployeeDto,
@@ -64,11 +66,13 @@ export class EmployeesController {
 
   /** Soft delete: the record is kept and can be restored. */
   @Delete(':id')
+  @Roles(Role.HR_MANAGER)
   softDelete(@Param('id') id: string): Promise<EmployeeResponse> {
     return this.employeesService.softDelete(id);
   }
 
   @Post(':id/restore')
+  @Roles(Role.HR_MANAGER)
   @HttpCode(HttpStatus.OK)
   restore(@Param('id') id: string): Promise<EmployeeResponse> {
     return this.employeesService.restore(id);
