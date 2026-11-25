@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getNavItemsForRole, isNavItemActive, NAV_ITEMS } from "./navigation";
-import { getDisplayName, getInitials } from "./user-display";
+import { getFullName, getInitials } from "@/lib/format";
 
 describe("getNavItemsForRole", () => {
   it("returns only items that list the role", () => {
@@ -28,9 +28,15 @@ describe("isNavItemActive", () => {
 
 describe("user display helpers", () => {
   it("builds names and initials with or without a last name", () => {
-    expect(getDisplayName({ firstName: "Ada", lastName: "Lovelace" })).toBe("Ada Lovelace");
-    expect(getDisplayName({ firstName: "Ada", lastName: null })).toBe("Ada");
+    expect(getFullName({ firstName: "Ada", lastName: "Lovelace" })).toBe("Ada Lovelace");
+    expect(getFullName({ firstName: "Ada", lastName: null })).toBe("Ada");
     expect(getInitials({ firstName: "ada", lastName: "lovelace" })).toBe("AL");
     expect(getInitials({ firstName: "Ada", lastName: null })).toBe("A");
+  });
+});
+describe("employee navigation", () => {
+  it("shows Employees to HR Managers only", () => {
+    expect(getNavItemsForRole("HR_MANAGER").map((item) => item.href)).toContain("/employees");
+    expect(getNavItemsForRole("ADMIN").map((item) => item.href)).not.toContain("/employees");
   });
 });

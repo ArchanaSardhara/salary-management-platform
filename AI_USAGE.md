@@ -838,3 +838,173 @@ Actually executed in `backend/`:
 **Outstanding:** Schema migration for `employees` table changes (`startDate`, `endDate`) has not been generated or applied to Neon.
 
 [human note: ]
+
+## 10. Frontend authentication pages, dashboard shell and route protection
+
+**What was asked:**
+Build the frontend Login (`/login`), Register (`/register`), Forgot Password (`/forgot-password`) and Dashboard (`/dashboard`) pages using `(auth)` and `(dashboard)` route groups, a root layout with global providers (`app/providers.tsx`, TanStack Query), role-based navigation and server-side session validation — keeping feature components, hooks, schemas, API functions and types out of route files and following the existing `src/` convention.
+
+**What AI generated:**
+- Read the bundled Next.js 16 docs (`node_modules/next/dist/docs`) first, per `frontend/AGENTS.md`: Proxy replaces middleware, `cookies()` must sit behind `<Suspense>` with Cache Components, `error.tsx` receives `retry` (not `reset`).
+- `src/app/providers.tsx`: moved from `src/providers/QueryProvider.tsx` (git mv, no duplicate provider); added "no retry on 4xx" queries and `retry: false` mutations.
+- `src/app/layout.tsx`: uses `./providers`, title template, fixed description typo.
+- `src/app/(auth)/layout.tsx` + login/register/forgot-password pages (thin route files rendering feature components).
+- `src/app/(dashboard)/layout.tsx`: verifies the session inside `<Suspense>` before rendering the sidebar shell; `dashboard/page.tsx` re-verifies (React `cache` dedupes).
+- `src/app/error.tsx`: root error boundary (also catches a failed session check in the dashboard layout).
+- `src/features/auth/`: `api.ts`, `hooks.ts` (TanStack mutations: login, register, forgot password, logout), `schemas.ts` (zod, mirrors backend DTO limits), `types.ts`, `routes.ts`, `server/session.ts` (server-only `getCurrentUser` DAL calling `GET /auth/verify`), form components, `AuthCard`.
+- `src/features/dashboard/`: `navigation.ts` (role-filtered nav config), `user-display.ts`, `AppSidebar`, `UserMenu` (sign out), `DashboardShell`, skeleton, `DashboardOverview` (empty state for statistics).
+- `src/components/brand-logo.tsx`, `src/components/form/{form-alert,submit-button}.tsx`.
+- `src/lib/api-client.ts` (same-origin `/api` fetch wrapper, `ApiError`, hides 5xx detail), `src/lib/api-url.ts`.
+- `src/proxy.ts`: redirects `/dashboard/*` to `/login` without a session cookie; rotates tokens with `POST /auth/refresh` when only a remember-me refresh token is present.
+- `next.config.ts`: `/api/:path*` rewrite to the backend.
+- `globals.css`: fixed self-referencing `--font-sans: var(--font-sans)` → `var(--font-geist-sans)`.
+- Tests: Vitest + RTL setup (`vitest.config.mts`, `src/test/`), tests for the three forms, navigation helpers and the proxy.
+- `frontend/README.md` rewritten with setup, `API_URL`, scripts, routes and protection model.
+
+**Files changed:**
+- `frontend/package.json`, `frontend/package-lock.json`, `frontend/next.config.ts`, `frontend/vitest.config.mts`, `frontend/README.md`
+- `frontend/src/app/layout.tsx`, `frontend/src/app/providers.tsx` (moved from `src/providers/QueryProvider.tsx`), `frontend/src/app/error.tsx`, `frontend/src/app/globals.css`
+- `frontend/src/app/(auth)/layout.tsx`, `frontend/src/app/(auth)/login/page.tsx`, `frontend/src/app/(auth)/register/page.tsx`, `frontend/src/app/(auth)/forgot-password/page.tsx`
+- `frontend/src/app/(dashboard)/layout.tsx`, `frontend/src/app/(dashboard)/dashboard/page.tsx`
+- `frontend/src/features/auth/**`, `frontend/src/features/dashboard/**`, `frontend/src/components/brand-logo.tsx`, `frontend/src/components/form/**`, `frontend/src/lib/api-client.ts`, `frontend/src/lib/api-url.ts`, `frontend/src/proxy.ts`, `frontend/src/proxy.test.ts`, `frontend/src/test/**`
+
+**Technical decisions:**
+- Same-origin API via Next rewrite, so the backend's httpOnly cookies work without CORS; `API_URL` is server-only (not `NEXT_PUBLIC_`). Default `http://localhost:4000` because Next's dev server uses 3000.
+- Two-layer protection: Proxy as an optimistic gate, `getCurrentUser()` (backend `/auth/verify`) as the authoritative check in layout and page. The backend still enforces authorization on every API call.
+- Forms: react-hook-form + zod (`@hookform/resolvers`); zod was already a transitive dependency. Client limits mirror backend DTOs (password 8–20, names ≤100, email ≤255).
+- Forgot-password UI shows the backend's neutral message so it never reveals whether an email is registered.
+- Test runner: Vitest 4 (Next.js docs' recommended setup). Vitest 5 and `@vitejs/plugin-react` were not used because of peer-dependency conflicts with the project's `@types/node@20` / Babel; Vite's built-in transform handles JSX.
+- Role-based navigation is a config filtered by role; only Dashboard exists today, so both roles currently see the same menu.
+
+**Debugging and problem-solving:**
+- npm peer conflicts (Vitest 5 → `@types/node>=22`; `@vitejs/plugin-react` → Babel 8; jest-dom 8 → Vitest 5) resolved by pinning Vitest 4 and jest-dom 6.
+- An `error.tsx` under `(dashboard)` would not catch errors thrown by that group's own layout; moved to `src/app/error.tsx`.
+- Ports 3000 (a running Next dev server) and 4000 (the running backend) were in use; the live check used a production build on port 3001 against the existing backend on 4000.
+
+**Test and verification results:**
+- `npm test` (Vitest): **5 files, 23/23 tests pass.**
+- `npx tsc --noEmit`: clean. `npm run build`: succeeds (`/dashboard` partial prerender, auth pages static, Proxy registered).
+- `npx eslint`: 1 error, in the pre-existing shadcn file `src/hooks/use-mobile.ts` (`react-hooks/set-state-in-effect`); no errors in new code. Not fixed (unrelated file).
+- Manual check against the real backend (production build on :3001 → API on :4000): `/dashboard` without cookie → 307 to `/login`; with a bogus token → server-side redirect to `/login`; `/api/auth/forgot-password` rewrite → neutral 201 message; in the browser: register → dashboard, sign out → `/login` and `/dashboard` blocked again, wrong password shows "Invalid credentials", correct sign-in at 375px mobile width → dashboard. A test user `ui-check-1124@example.test` was created in the local database during this check.
+- Not verified: the remember-me refresh path against the real backend (unit-tested only), screen-reader testing, dark mode.
+
+**Outstanding / flagged:**
+- Dashboard statistics: no reporting endpoint exists yet (feature F6), so the dashboard shows an empty state instead of figures.
+- `ADMIN` role: `feature-plan.md` assumes no Admin scope, but the backend has an `ADMIN` role and `/auth/verify` admits it. Admin-only navigation (e.g. user management) was not added — needs a product decision.
+- No reset-password page (`/reset-password?token=…`); the backend has `POST /auth/reset-password`, but sending the reset email is commented out in `AuthService.forgotPassword`.
+- Public `/register` creates an `HR_MANAGER` account for anyone — confirm self-registration is intended.
+- Backend: `${Number(process.env.JWT_ACCESS_EXPIRES_IN)}d` produces `NaNd` if the variable is set to a value like `15m` (the schema default). Not changed (backend scope).
+- Signed-in users visiting `/login` are not redirected to `/dashboard`.
+
+[human note: ]
+
+## 11. Fix 404 on login after backend added `/api` prefix and URI versioning
+
+**What was asked:** Find out why the API returned 404 for login.
+
+**Root cause (AI diagnosis):**
+- The developer changed `backend/src/main.ts` to `setGlobalPrefix('api')` + URI versioning (`v1` default), so routes are served at `/api/v1/...` (e.g. `/api/v1/auth/login`).
+- The developer also changed `frontend/src/lib/api-client.ts` to call the backend directly at `getApiUrl() + "/v1/api"`, which reverses the segment order → `/v1/api/auth/login` → 404.
+- The server-side session check (`session.ts` → `/auth/verify`) and the proxy's token refresh (`proxy.ts` → `/auth/refresh`) still used unprefixed paths, so they would also have returned 404 once login succeeded.
+
+**What AI changed:**
+- `frontend/src/lib/api-url.ts`: added `API_PREFIX = "/api/v1"` (documented as mirroring `backend/src/main.ts`) and `getApiBaseUrl()`.
+- `frontend/src/lib/api-client.ts`: `API_BASE_PATH = getApiBaseUrl()` (keeps the developer's direct-to-backend approach).
+- `frontend/src/features/auth/server/session.ts`, `frontend/src/proxy.ts`: use `getApiBaseUrl()`.
+- `frontend/next.config.ts`: rewrite destination now `${API_URL}/api/:path*` so the same-origin `/api/v1/*` path stays correct if used.
+- Tests updated to the new URLs: `login-form.test.tsx`, `register-form.test.tsx`, `forgot-password-form.test.tsx`, `proxy.test.ts`.
+
+**Verification:**
+- `npm test`: 23/23 pass. `npx tsc --noEmit`: clean.
+- curl against the running backend: `POST /api/v1/auth/login` (bad credentials) → 401 (was 404); `/api/v1/auth/verify` and `/api/v1/auth/refresh` without cookies → 401; CORS preflight from `http://localhost:3000` → 204 with `Access-Control-Allow-Origin: http://localhost:3000` and credentials allowed.
+- Browser on the developer's dev server (:3000): sign in → `/dashboard` (server-side verify succeeds) → sign out → sign in again → `/dashboard`.
+
+**Notes for the developer:**
+- `process.env.API_URL` is not available in the browser (no `NEXT_PUBLIC_` prefix), so client calls always use the `http://localhost:4000` default. That only works locally. Deploying needs either a `NEXT_PUBLIC_` URL or a switch back to same-origin `/api/v1` calls through the rewrite.
+- Cookies are shared between `localhost:3000` and `localhost:4000` because cookies are scoped by host, not port. On separate domains in production the frontend server could not read the `access_token` cookie, which breaks the server-side session check.
+
+[human note: ]
+
+## 12. Employee directory (search, filters, pagination) with create, view, edit and delete
+
+**What was asked:** Implement the Employee Directory: total employee count, search, filter controls, data table (Employee ID, Name, Email, Country, Department, Designation, Employment Status, Joining Date, Actions), server-side pagination (configurable page size, current page, total records, total pages, previous/next with disabled states), an Add Employee button, and View/Edit/Delete row actions. Debounced search by name/email/employee ID; country, department and employment-status filters; clear all filters; filters and pagination preserved in URL search params. Create the needed common UI components, hooks and utils.
+
+**Developer decisions (asked in chat before building):**
+- Add/View/Edit: **build the pages too** (`/employees/new`, `/employees/[id]`, `/employees/[id]/edit`) rather than linking to routes that don't exist.
+- **Extend the backend** list endpoint with server-side search/country/department filtering (required by `requirements.md` and the F2 plan) and add a lookup endpoint for filter options.
+
+**What AI generated — backend:**
+- `ListEmployeesQueryDto`: optional `search` (trimmed, max 100, blank = not provided), `countryCode` (uppercased, ISO 3166-1 alpha-2), `department` (fixed list).
+- `employees.service.ts`: exported `buildListWhere()`. Every whitespace-separated search term must match first name, last name or email (case-insensitive `contains`). A term that looks like an employee code (`EMP-000042`, `emp42`, `42`) also matches that `employeeNumber` exactly. Combined with status, country and department via `AND`.
+- `parseEmployeeCode()` in `employee.constants.ts`.
+- New `GET /employees/options` (HR_MANAGER, declared before `:id`): `{ countryCodes (all ISO alpha-2 from validator's list), countriesInUse (distinct employee countries), departments, jobTitles }`. This replaces the `GET /employees/countries` proposed in chat: one lookup also serves the form, so the frontend doesn't duplicate the department/job-title lists.
+
+**What AI generated — frontend:**
+- Common: `hooks/use-debounced-callback.ts`, `hooks/use-search-params-state.ts`, `lib/search-params.ts`, `lib/format.ts` (UTC-safe date formatting, `Intl.DisplayNames` country names, `getFullName`/`getInitials` — replaced `features/dashboard/user-display.ts`), `components/{page-header,search-input,filter-select,data-table-pagination,confirm-dialog,empty-state,query-error}.tsx`, `components/form/select-field.tsx`, `components/ui/badge.tsx`.
+- `features/employees/`: `types.ts`, `api.ts`, `hooks.ts` (query keys; list uses `keepPreviousData`; mutations invalidate lists/options), `list-params.ts` (URL ↔ state, validation of page/pageSize/status), `schemas.ts` (zod form schema, payload builders; PATCH sends only changed fields + `version`), `display.ts`, `routes.ts`, components: directory, filters, table, row actions, status badge, delete dialog, form, create/edit views, profile, not-found, skeletons.
+- Routes under `app/(dashboard)/employees/…`, each guarded on the server with new `requireRole(["HR_MANAGER"])` inside `<Suspense>`.
+- `providers.tsx`: `<Toaster>` for success toasts; query/mutation 401 → redirect to `/login` (except on public auth pages).
+- `proxy.ts` matcher now includes `/employees/:path*`; sidebar shows "Employees" to HR Managers only.
+- `dashboard-shell.tsx`: `min-w-0` on `SidebarInset` so wide tables scroll inside the card instead of widening the page.
+
+**Technical decisions:**
+- "Employment Status" maps to the backend's existing status: Active vs Deleted (soft-deleted). Filter options Active (default) / Deleted / All statuses.
+- "Designation" = `jobTitle`; "Joining Date" = `startDate`; "Employee ID" = `employeeCode`.
+- Delete is the backend's soft delete, behind a confirmation dialog. Edit and Delete are disabled for deleted employees (the backend rejects edits of deleted records).
+- Search input holds local text and commits after 300 ms (debounced in the event handler, not an effect). It follows outside URL changes (Clear filters, back/forward) unless an edit is pending.
+- Any filter change resets to page 1. A page number past the last page shows a "Go to last page" state.
+- Client-only rule added to the form: end date cannot be before the joining date (the backend doesn't enforce this — flagged below).
+
+**Debugging and problem-solving:**
+- First browser pass: page widened to 1160px at a 1024px viewport. Cause: the five-column filter row's minimum widths plus a missing `min-w-0` on the shell. Fixed (filters use a single row from `xl`; shell `min-w-0`). Re-measured: page width equals viewport.
+- Directory said "1 employee match your filters" → fixed to "matches".
+- The developer's dev server (:3000) began hanging on server Suspense boundaries for every protected page, including `/dashboard`, after a transient parse error in the developer's in-progress `brand-logo.tsx` edit and hot reloads (plus a hydration warning from stale server modules). A fresh production build with a real session cookie rendered all six protected pages fully (0.3–0.5 s), so this was dev-server state, not the feature.
+
+**Test and verification results:**
+- Backend `npm test`: **23 suites, 282/282 pass** (new: `buildListWhere`, `parseEmployeeCode`, `getOptions`, HTTP tests for filters, 400s for invalid country/department/long search, blank-param handling, `/employees/options` routing). `tsc --noEmit` clean. `npx oxlint src/modules/api/employees` clean. `npm run lint` (type-aware) could not run: `tsgolint.exe` fails to spawn on this machine (`spawnSync … UNKNOWN`), unrelated to these changes.
+- Frontend `npm test`: **12 files, 73/73 pass** (new: search-params, list-params, form schema, SearchInput debounce/sync, pagination disabled states, directory integration — columns, total, URL→API params, debounced search URL update, paging, clear filters, empty/no-results/error/retry, past-last-page, delete flow, deleted-row actions — and create/edit views). `tsc` clean; `npm run build` succeeds. ESLint: no issues in new code. Two remaining issues are in the developer's files: the existing `use-mobile.ts` error and an unused `WalletCardsIcon` import warning in `brand-logo.tsx`.
+- Browser (developer's dev server + running backend): added an employee through the form (created as EMP-000001, toast, profile shown); edit (Save disabled until a change; PATCH 200; department saved); search `emp-1` → 1 result via `?q=emp-1`; non-matching search → no-results state; Clear filters → URL and input reset; delete from row menu → confirm → DELETE 200 → list refreshed. Test data left in the local DB: employee "Test Directory" (EMP-000001, now soft-deleted).
+- Not verified in a browser: country/department select filtering (covered by backend tests and the URL→API test), page-size change, the `?status=deleted` view (dev server hang), the ADMIN redirect (no admin account), screen-reader testing, dark mode.
+
+**Outstanding / flagged for the developer:**
+- `requirements.md` F2 also lists a **job title filter** and **server-side sorting**; neither was in this request, so neither was built.
+- **Employment status** only distinguishes Active/Deleted. Whether `endDate` should make someone "Terminated"/"Inactive" is a business decision not yet made.
+- **End date ≥ joining date** is enforced only in the frontend form; the backend accepts any order.
+- **Restore** (`POST /employees/:id/restore`) exists in the backend but has no UI.
+- Restart the frontend dev server to clear the hang described above.
+
+[human note: ]
+
+## 13. Infinite scroll and multi-select filters for the employee directory
+
+**What was asked:** Load the employee list on scroll, and make the Department, Employment status and Country filters multi-select.
+
+**What AI generated — backend:**
+- `ListEmployeesQueryDto`: `countryCode`, `department` and `status` are now lists. They accept a single value or repeated keys (`?department=A&department=B`), trimmed, blanks and duplicates dropped, validated per item (ISO alpha-2 / fixed department list / `active|deleted|all`), with max list sizes. `status` defaults to `['active']`. Old single-value requests still work.
+- `buildListWhere`: `countryCode IN (…)`, `department IN (…)`. Status: `all`, or both `active` and `deleted`, adds no condition; otherwise the single status applies. No conditions at all → `{}`.
+- Tests updated for the new contract, plus new ones: multi-value matching, all-status combinations, repeated-key parsing with normalisation and de-duplication, blank items, one invalid item among valid ones → 400.
+
+**What AI generated — frontend:**
+- `hooks/use-infinite-scroll.ts`: IntersectionObserver on a sentinel. It re-observes after every load (`loadedCount`), so a still-visible sentinel keeps loading and a fast fetch can't stall it. No-op without IntersectionObserver.
+- `components/multi-select-filter.tsx` (Base UI `Select multiple`, trigger summary "All …" / "India" / "India +2").
+- `features/employees`: `useInfiniteEmployees` (`useInfiniteQuery`, 25 per batch, `keepPreviousData` while filters change); `list-params.ts` rewritten (`EmployeeListFilters` with lists; URL uses repeated keys; `status=all` encodes "every status" because a missing `status` means the default, active only); `employee-list-footer.tsx` ("Showing X of N", spinner, "Load N more" button for keyboard users, end-of-list message, load-more error with retry that pauses auto-loading); filters and directory updated.
+- `lib/search-params.ts`: list support (`readList`, repeated-key writing, order-insensitive default comparison). Removed `readPositiveInt`/`readOneOf`, which are now unused.
+- Removed `components/filter-select.tsx` and `components/data-table-pagination.tsx` (+ its test): no remaining users after the switch to infinite scroll and multi-select.
+
+**Developer-visible behaviour changes:**
+- The page-size selector, page numbers and Previous/Next controls from entry #12 are replaced by infinite scrolling. `page`/`pageSize` are no longer URL params. The backend still paginates; batches are fetched one page at a time.
+- Status: selecting nothing means all statuses (shown as "All statuses", URL `status=all`).
+
+**Debugging:**
+- The first infinite-scroll test exposed a real bug: the observer was only re-created when `isLoading` changed. If a fetch resolved before React rendered the loading state, scrolling stopped. Fixed with the `loadedCount` dependency; covered by a hook test.
+
+**Test and verification results:**
+- Backend `npm test`: **23 suites, 289/289 pass**. `npx oxlint src/modules/api/employees`: clean (exit 0). Type-aware `npm run lint` still can't start `tsgolint.exe` on this machine (see #12).
+- Frontend `npm test`: **13 files, 88/88 pass** (directory: scroll loads pages 1→2→3 with pageSize 25, "Load N more", load-more error/retry without an auto-retry loop, multi-value URL → repeated API keys, `status=all`, selection summary, adding a department via the multi-select, deselecting all statuses → `status=all`, search, clear filters, empty/no-results/error, delete, deleted-row actions; hook tests; summary tests; list-params round-trip). `tsc` clean. `npm run build` succeeds. ESLint: no issues in new code (the existing `use-mobile.ts` error and the `brand-logo.tsx` unused-import warning remain).
+- **Not verified in a browser:** the developer's dev server on :3000 is still hanging on server Suspense boundaries (all protected pages, see #12), and testing on another port is blocked by the backend's CORS (`localhost:3000` only). The local DB also has no seed data (one soft-deleted test employee), so real scrolling couldn't be exercised.
+
+**Outstanding / flagged:**
+- Restart the frontend dev server, then check scrolling and the multi-selects in the browser. Real scrolling needs more than 25 employees (the seed script from `requirements.md` doesn't exist yet).
+- `requirements.md` lists "server-side … pagination"; that is still how the API works, but the UI no longer shows page numbers or a page size. Confirm this replaces the pagination UI requested in #12.
+
+[human note: ]

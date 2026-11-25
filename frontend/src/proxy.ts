@@ -8,7 +8,8 @@ import {
 import { getApiBaseUrl } from "@/lib/api-url";
 
 /**
- * Optimistic route protection for the authenticated area.
+ * Optimistic route protection for the authenticated area (dashboard and
+ * employee pages; keep `config.matcher` in sync with `app/(dashboard)`).
  *
  * - No access token and no refresh token: redirect to /login before rendering.
  * - Access token expired but a "remember me" refresh token exists: rotate the
@@ -72,5 +73,5 @@ function readCookieValue(setCookies: string[], name: string): string | null {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/employees/:path*"],
 };

@@ -46,24 +46,48 @@ npm run test:watch  # Vitest in watch mode
 | `/register`        | `src/app/(auth)/register/page.tsx`           | Public |
 | `/forgot-password` | `src/app/(auth)/forgot-password/page.tsx`    | Public |
 | `/dashboard`       | `src/app/(dashboard)/dashboard/page.tsx`     | Signed-in `HR_MANAGER` / `ADMIN` |
+| `/employees`       | `src/app/(dashboard)/employees/page.tsx`     | `HR_MANAGER` |
+| `/employees/new`   | `src/app/(dashboard)/employees/new/page.tsx` | `HR_MANAGER` |
+| `/employees/[id]`  | `src/app/(dashboard)/employees/[id]/page.tsx` | `HR_MANAGER` |
+| `/employees/[id]/edit` | `src/app/(dashboard)/employees/[id]/edit/page.tsx` | `HR_MANAGER` |
 
 Route groups `(auth)` and `(dashboard)` only select a layout; they do not appear in URLs.
 
+### Employee directory URL parameters
+
+The directory keeps its filters in the URL, so reloads, bookmarks and shared links keep the same view. Defaults are omitted. Multi-select filters repeat the key, e.g. `?country=IN&country=US`.
+
+| Param        | Meaning | Default |
+| ------------ | ------- | ------- |
+| `q`          | Search by name, email or employee ID (debounced 300 ms) | — |
+| `country`    | One or more ISO 3166-1 alpha-2 country codes | all countries |
+| `department` | One or more department names | all departments |
+| `status`     | One or more of `active`, `deleted`; `all` = every status | `active` |
+
+The list loads 25 employees at a time and fetches the next batch as you scroll near the end (a "Load more" button does the same for keyboard users). Scroll position is not kept in the URL.
+
 ### Route protection
 
-1. `src/proxy.ts` (Next.js Proxy, formerly middleware) runs for `/dashboard/*`: with no access-token cookie it redirects to `/login`, or — if a "Keep me signed in" refresh token exists — rotates tokens via `POST /auth/refresh` and continues.
-2. `getCurrentUser()` (`src/features/auth/server/session.ts`) is the authoritative check: it validates the token with `GET /auth/verify` on the server and redirects to `/login` if the session is missing, invalid, inactive or not an allowed role. Both the dashboard layout and page call it (deduplicated per request).
+1. `src/proxy.ts` (Next.js Proxy, formerly middleware) runs for `/dashboard/*` and `/employees/*`: with no access-token cookie it redirects to `/login`, or — if a "Keep me signed in" refresh token exists — rotates tokens via `POST /auth/refresh` and continues.
+2. `getCurrentUser()` (`src/features/auth/server/session.ts`) is the authoritative check: it validates the token with `GET /auth/verify` on the server and redirects to `/login` if the session is missing, invalid, inactive or not an allowed role. Both the dashboard layout and page call it (deduplicated per request). Employee pages call `requireRole(["HR_MANAGER"])`, which also sends other roles to `/dashboard`.
+3. In the browser, any API call that returns 401 (expired session) redirects to `/login` (`src/app/providers.tsx`).
 
 ## Project structure
 
 ```
 src/
   app/                      # routing only: layouts, pages, error boundary, providers
-  components/ui/            # shadcn/ui primitives
-  components/form/          # shared form pieces (FormAlert, SubmitButton)
+  components/ui/            # shadcn/ui primitives (+ Badge)
+  components/form/          # shared form pieces (FormAlert, SubmitButton, SelectField)
+  components/               # shared UI: PageHeader, SearchInput, MultiSelectFilter,
+                            #   ConfirmDialog, EmptyState, QueryError
   features/auth/            # api.ts, hooks.ts, schemas.ts, types.ts, routes.ts, components/, server/
   features/dashboard/       # navigation config (role-based), shell, sidebar, user menu
-  lib/                      # api-client (browser fetch wrapper), api-url
+  features/employees/       # api.ts, hooks.ts (TanStack Query), list-params.ts (URL state),
+                            #   schemas.ts (form), types.ts, routes.ts, components/
+  hooks/                    # useDebouncedCallback, useSearchParamsState, useInfiniteScroll, useIsMobile
+  lib/                      # api-client, api-url, format (dates, country names, names),
+                            #   search-params (typed URL param helpers)
   proxy.ts                  # optimistic route protection
   test/                     # test setup and helpers
 ```

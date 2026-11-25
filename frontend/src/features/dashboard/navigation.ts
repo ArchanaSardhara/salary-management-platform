@@ -1,4 +1,4 @@
-import { LayoutDashboardIcon, type LucideIcon } from "lucide-react";
+import { LayoutDashboardIcon, UsersIcon, type LucideIcon } from "lucide-react";
 
 import type { Role } from "@/features/auth/types";
 
@@ -20,6 +20,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/dashboard",
     icon: LayoutDashboardIcon,
     roles: ["HR_MANAGER", "ADMIN"],
+  },
+  {
+    title: "Employees",
+    href: "/employees",
+    icon: UsersIcon,
+    roles: ["HR_MANAGER"],
   },
 ];
 

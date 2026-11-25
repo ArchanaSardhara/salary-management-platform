@@ -8,7 +8,7 @@ import { z } from "zod";
 import { getApiBaseUrl } from "@/lib/api-url";
 
 import { ACCESS_TOKEN_COOKIE, AUTH_ROUTES } from "../routes";
-import { ROLES, type SessionUser } from "../types";
+import { ROLES, type Role, type SessionUser } from "../types";
 
 const verifiedUserSchema = z.object({
   id: z.string(),
@@ -62,3 +62,16 @@ export const getCurrentUser = cache(async (): Promise<SessionUser> => {
   const { id, firstName, lastName, email, role } = parsed.data;
   return { id, firstName, lastName, email, role };
 });
+
+/**
+ * Like `getCurrentUser`, but also requires one of `roles`. Users with another
+ * role are sent to the dashboard. The backend enforces the same roles on
+ * every API call; this only keeps them away from pages they cannot use.
+ */
+export async function requireRole(roles: readonly Role[]): Promise<SessionUser> {
+  const user = await getCurrentUser();
+  if (!roles.includes(user.role)) {
+    redirect(AUTH_ROUTES.afterLogin);
+  }
+  return user;
+}

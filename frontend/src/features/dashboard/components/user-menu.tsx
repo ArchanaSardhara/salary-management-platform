@@ -20,7 +20,7 @@ import {
 import { useLogout } from "@/features/auth/hooks";
 import { ROLE_LABELS, type SessionUser } from "@/features/auth/types";
 
-import { getDisplayName, getInitials } from "../user-display";
+import { getFullName, getInitials } from "@/lib/format";
 
 interface UserMenuProps {
   user: SessionUser;
@@ -28,7 +28,7 @@ interface UserMenuProps {
 
 export function UserMenu({ user }: UserMenuProps) {
   const logout = useLogout();
-  const displayName = getDisplayName(user);
+  const displayName = getFullName(user);
 
   return (
     <SidebarMenu>
