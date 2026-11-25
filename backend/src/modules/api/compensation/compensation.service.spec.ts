@@ -20,6 +20,7 @@ describe('CompensationService', () => {
     create: jest.fn(),
   };
   const auditLogModel = {
+    findFirst: jest.fn(),
     create: jest.fn(),
   };
   const tx = {
@@ -264,9 +265,11 @@ describe('CompensationService', () => {
         changedAt: now,
         beforeValue: null,
         afterValue: { amount: '5000.00', currencyCode: 'USD', effectiveFrom: '2026-01-01', effectiveTo: null },
+        changedBy: null,
       };
       employeeModel.findUnique.mockResolvedValue(activeEmployee);
-      compensationModel.findFirst.mockResolvedValue({ ...dbRecord, auditLog });
+      compensationModel.findFirst.mockResolvedValue(dbRecord);
+      auditLogModel.findFirst.mockResolvedValue(auditLog);
 
       const result = await service.findAuditLog('emp-1', 'rec-1');
 
