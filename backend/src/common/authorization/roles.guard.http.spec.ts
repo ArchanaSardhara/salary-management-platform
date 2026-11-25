@@ -93,44 +93,44 @@ describe('RolesGuard (HTTP)', () => {
   });
 
   it('returns 401 for an unauthenticated request to a protected route', async () => {
-    await request(app.getHttpServer()).get('/hr').expect(401);
-    await request(app.getHttpServer()).get('/admin').expect(401);
+    await request(app.getHttpServer()).get('/api/v1/hr').expect(401);
+    await request(app.getHttpServer()).get('/api/v1/admin').expect(401);
   });
 
   it('lets HR_MANAGER reach HR routes but returns 403 on admin routes', async () => {
     currentUser = hrManager;
 
     await request(app.getHttpServer())
-      .get('/hr')
+      .get('/api/v1/hr')
       .expect(200, { ok: 'hr' });
-    await request(app.getHttpServer()).get('/admin').expect(403);
+    await request(app.getHttpServer()).get('/api/v1/admin').expect(403);
   });
 
   it('lets ADMIN reach admin routes but returns 403 on HR routes', async () => {
     currentUser = admin;
 
     await request(app.getHttpServer())
-      .get('/admin')
+      .get('/api/v1/admin')
       .expect(200, { ok: 'admin' });
-    await request(app.getHttpServer()).get('/hr').expect(403);
+    await request(app.getHttpServer()).get('/api/v1/hr').expect(403);
   });
 
   it('returns 403 for a deactivated user with the right role', async () => {
     currentUser = { ...hrManager, isActive: false };
 
-    const res = await request(app.getHttpServer()).get('/hr').expect(403);
+    const res = await request(app.getHttpServer()).get('/api/v1/hr').expect(403);
     expect(JSON.stringify(res.body)).toContain('Account is deactivated');
   });
 
   it('returns 403 when authentication did not provide a role', async () => {
     currentUser = { id: 'u', isActive: true };
 
-    await request(app.getHttpServer()).get('/hr').expect(403);
+    await request(app.getHttpServer()).get('/api/v1/hr').expect(403);
   });
 
   it('does not restrict routes without @Roles', async () => {
     await request(app.getHttpServer())
-      .get('/public')
+      .get('/api/v1/public')
       .expect(200, { ok: 'public' });
   });
 });

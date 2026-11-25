@@ -86,7 +86,7 @@ describe('AuthController (HTTP)', () => {
     return header ?? [];
   }
 
-  describe('POST /auth/register', () => {
+  describe('POST /api/v1/auth/register', () => {
     it('sets the access and refresh cookies as httpOnly and returns success', async () => {
       authService.register.mockResolvedValue({
         accessToken: 'access',
@@ -94,7 +94,7 @@ describe('AuthController (HTTP)', () => {
       });
 
       const res = await request(app.getHttpServer())
-        .post('/auth/register')
+        .post('/api/v1/auth/register')
         .send({ ...registerBody, rememberMe: true })
         .expect(200);
 
@@ -121,7 +121,7 @@ describe('AuthController (HTTP)', () => {
       });
 
       const res = await request(app.getHttpServer())
-        .post('/auth/register')
+        .post('/api/v1/auth/register')
         .send(registerBody)
         .expect(200);
 
@@ -132,7 +132,7 @@ describe('AuthController (HTTP)', () => {
 
     it('rejects a client-supplied role with 400', async () => {
       await request(app.getHttpServer())
-        .post('/auth/register')
+        .post('/api/v1/auth/register')
         .send({ ...registerBody, role: Role.ADMIN })
         .expect(400);
 
@@ -140,7 +140,7 @@ describe('AuthController (HTTP)', () => {
     });
   });
 
-  describe('POST /auth/login', () => {
+  describe('POST /api/v1/auth/login', () => {
     it('returns success and sets cookies on valid credentials', async () => {
       authService.login.mockResolvedValue({
         accessToken: 'access',
@@ -148,7 +148,7 @@ describe('AuthController (HTTP)', () => {
       });
 
       const res = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/api/v1/auth/login')
         .send({ email: 'ada@example.com', password: 'password123' })
         .expect(200);
 
@@ -162,7 +162,7 @@ describe('AuthController (HTTP)', () => {
       );
 
       const res = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/api/v1/auth/login')
         .send({ email: 'ada@example.com', password: 'wrong-password' })
         .expect(401);
 
@@ -175,7 +175,7 @@ describe('AuthController (HTTP)', () => {
       );
 
       const res = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/api/v1/auth/login')
         .send({ email: 'ada@example.com', password: 'password123' })
         .expect(403);
 
@@ -184,7 +184,7 @@ describe('AuthController (HTTP)', () => {
 
     it('rejects an invalid request body with 400', async () => {
       await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/api/v1/auth/login')
         .send({ email: 'not-an-email' })
         .expect(400);
 
@@ -192,7 +192,7 @@ describe('AuthController (HTTP)', () => {
     });
   });
 
-  describe('GET /auth/verify', () => {
+  describe('GET /api/v1/auth/verify', () => {
     it.each([Role.HR_MANAGER, Role.ADMIN])(
       'returns the authenticated %s user from request.user',
       async (role) => {
@@ -200,7 +200,7 @@ describe('AuthController (HTTP)', () => {
         authService.verify.mockImplementation((user: IUser) => user);
 
         const res = await request(app.getHttpServer())
-          .get('/auth/verify')
+          .get('/api/v1/auth/verify')
           .expect(200);
 
         expect(authService.verify).toHaveBeenCalledWith(currentUser);
@@ -209,7 +209,7 @@ describe('AuthController (HTTP)', () => {
     );
 
     it('returns 401 when no user is authenticated', async () => {
-      await request(app.getHttpServer()).get('/auth/verify').expect(401);
+      await request(app.getHttpServer()).get('/api/v1/auth/verify').expect(401);
       expect(authService.verify).not.toHaveBeenCalled();
     });
 
@@ -217,7 +217,7 @@ describe('AuthController (HTTP)', () => {
       currentUser = { ...activeUser(Role.HR_MANAGER), isActive: false };
 
       const res = await request(app.getHttpServer())
-        .get('/auth/verify')
+        .get('/api/v1/auth/verify')
         .expect(403);
 
       expect(JSON.stringify(res.body)).toContain('Account is deactivated');
@@ -227,17 +227,17 @@ describe('AuthController (HTTP)', () => {
     it('returns 403 when the JWT guard rejects the request', async () => {
       guard.canActivate.mockReturnValueOnce(false);
 
-      await request(app.getHttpServer()).get('/auth/verify').expect(403);
+      await request(app.getHttpServer()).get('/api/v1/auth/verify').expect(403);
       expect(authService.verify).not.toHaveBeenCalled();
     });
   });
 
-  describe('POST /auth/refresh', () => {
+  describe('POST /api/v1/auth/refresh', () => {
     it('passes the refresh_token cookie to the service', async () => {
       authService.refresh.mockResolvedValue({ message: 'Token refreshed' });
 
       await request(app.getHttpServer())
-        .post('/auth/refresh')
+        .post('/api/v1/auth/refresh')
         .set('Cookie', 'refresh_token=raw-refresh')
         .expect(201);
 
@@ -253,18 +253,18 @@ describe('AuthController (HTTP)', () => {
       );
 
       await request(app.getHttpServer())
-        .post('/auth/refresh')
+        .post('/api/v1/auth/refresh')
         .set('Cookie', 'refresh_token=raw-refresh')
         .expect(403);
     });
   });
 
-  describe('POST /auth/logout', () => {
+  describe('POST /api/v1/auth/logout', () => {
     it('revokes the refresh token and clears both cookies', async () => {
       authService.logout.mockResolvedValue(undefined);
 
       const res = await request(app.getHttpServer())
-        .post('/auth/logout')
+        .post('/api/v1/auth/logout')
         .set('Cookie', 'refresh_token=raw-refresh')
         .expect(201);
 
@@ -280,7 +280,7 @@ describe('AuthController (HTTP)', () => {
     });
   });
 
-  describe('POST /auth/forgot-password', () => {
+  describe('POST /api/v1/auth/forgot-password', () => {
     it('returns the service message', async () => {
       const message = {
         message: 'If an account exists, a password reset email has been sent.',
@@ -288,7 +288,7 @@ describe('AuthController (HTTP)', () => {
       authService.forgotPassword.mockResolvedValue(message);
 
       const res = await request(app.getHttpServer())
-        .post('/auth/forgot-password')
+        .post('/api/v1/auth/forgot-password')
         .send({ email: 'ada@example.com' })
         .expect(201);
 
@@ -299,20 +299,21 @@ describe('AuthController (HTTP)', () => {
     });
   });
 
-  describe('POST /auth/reset-password', () => {
+  describe('POST /api/v1/auth/reset-password', () => {
     it('passes token and password to the service', async () => {
       authService.resetPassword.mockResolvedValue({
         message: 'Password reset successfully',
       });
 
       await request(app.getHttpServer())
-        .post('/auth/reset-password')
+        .post('/api/v1/auth/reset-password')
         .send({ token: 'raw-token', password: 'newPassword1' })
         .expect(201);
 
       expect(authService.resetPassword).toHaveBeenCalledWith(
         'raw-token',
         'newPassword1',
+        expect.any(String),
       );
     });
 
@@ -322,7 +323,7 @@ describe('AuthController (HTTP)', () => {
       );
 
       await request(app.getHttpServer())
-        .post('/auth/reset-password')
+        .post('/api/v1/auth/reset-password')
         .send({ token: 'bad', password: 'newPassword1' })
         .expect(401);
     });
