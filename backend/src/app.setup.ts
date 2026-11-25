@@ -13,7 +13,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
  * against the same middleware, pipes, filters and interceptors as production.
  */
 export function configureApp(app: INestApplication): void {
-  const appOrigins = ['http://localhost:3000', process.env.FRONTEND_URL].filter(
+  const appOrigins = ['http://localhost:3000', process.env.APP_URL].filter(
     (origin): origin is string => Boolean(origin),
   );
 
@@ -38,7 +38,9 @@ export function configureApp(app: INestApplication): void {
 
   app.useSecurityHeaders({
     contentSecurityPolicy: {
-      reportOnly: true,
+      // Report-only in development so violations surface in the console without
+      // breaking anything. Enforcing in production blocks actual violations.
+      reportOnly: process.env.NODE_ENV !== 'production',
       directives: {
         defaultSrc: ["'none'"],
         baseUri: ["'self'"],
@@ -49,12 +51,15 @@ export function configureApp(app: INestApplication): void {
     },
   });
 
+  // NestJS 12 CSRF protection is origin-based (Sec-Fetch-Site + Origin header
+  // comparison), not token-based. The frontend does not need to send any CSRF
+  // token; the browser's Origin header and trustedOrigins list are sufficient.
   app.enableCsrfProtection({ trustedOrigins: appOrigins });
   app.enableCors({
     origin: appOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   app.useGlobalFilters(new AllExceptionsFilter());
