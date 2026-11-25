@@ -30,7 +30,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
             Salary Management Platform
           </span>
         </header>
-        <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6">{children}</div>
+        <div className="p-4 sm:p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

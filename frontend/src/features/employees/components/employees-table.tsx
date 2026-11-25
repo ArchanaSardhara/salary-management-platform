@@ -21,13 +21,13 @@ import { EmployeeRowActions } from "./employee-row-actions";
 import { EmployeeStatusBadge } from "./employee-status-badge";
 
 const COLUMNS = [
-  "Employee ID",
-  "Employee Name",
+  "ID",
+  "Name",
   "Email",
   "Country",
   "Department",
-  "Designation",
-  "Employment Status",
+  "Title",
+  "Status",
   "Joining Date",
 ] as const;
 
@@ -39,6 +39,9 @@ interface EmployeesTableProps {
   isRefreshing: boolean;
   skeletonRows: number;
   onDelete: (employee: Employee) => void;
+  /** `top` offset (px) for the sticky table header — accounts for the
+   *  dashboard header + sticky filter bar above the table. */
+  tableHeadTop?: number;
 }
 
 export function EmployeesTable({
@@ -47,6 +50,7 @@ export function EmployeesTable({
   isRefreshing,
   skeletonRows,
   onDelete,
+  tableHeadTop = 56,
 }: EmployeesTableProps) {
   return (
     <div
@@ -56,16 +60,39 @@ export function EmployeesTable({
       )}
       aria-busy={isLoading || isRefreshing}
     >
-      <Table>
+      {/* table-fixed with no overflow on the container keeps all columns
+          visible without a horizontal scrollbar while allowing sticky <th>
+          elements to anchor to the page scroll (not a local scroll context). */}
+      <Table containerClassName="relative w-full" className="table-fixed">
+        <colgroup>
+          <col className="w-[8%]" />
+          <col className="w-[14%]" />
+          <col className="w-[17%]" />
+          <col className="w-[13%]" />
+          <col className="w-[12%]" />
+          <col className="w-[13%]" />
+          <col className="w-[10%]" />
+          <col className="w-[8%]" />
+          <col className="w-[5%]" />
+        </colgroup>
         <TableCaption className="sr-only">Employee directory</TableCaption>
         <TableHeader>
           <TableRow>
             {COLUMNS.map((column) => (
-              <TableHead key={column} scope="col" className="whitespace-nowrap">
+              <TableHead
+                key={column}
+                scope="col"
+                className="sticky z-10 bg-secondary"
+                style={{ top: tableHeadTop }}
+              >
                 {column}
               </TableHead>
             ))}
-            <TableHead scope="col" className="text-right">
+            <TableHead
+              scope="col"
+              className="sticky z-10 bg-secondary text-right"
+              style={{ top: tableHeadTop }}
+            >
               Actions
             </TableHead>
           </TableRow>
@@ -76,34 +103,47 @@ export function EmployeesTable({
                 <TableRow key={index} aria-hidden="true">
                   {Array.from({ length: COLUMNS.length + 1 }, (_, cell) => (
                     <TableCell key={cell}>
-                      <Skeleton className="h-4 w-full min-w-16" />
+                      <Skeleton className="h-4 w-full" />
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             : employees?.map((employee) => (
                 <TableRow key={employee.id}>
-                  <TableCell className="font-mono text-xs whitespace-nowrap">
+                  <TableCell className="font-mono text-xs">
                     {employee.employeeCode}
                   </TableCell>
-                  <TableCell className="font-medium whitespace-nowrap">
+                  <TableCell className="max-w-0 truncate font-medium">
                     <Link
                       href={EMPLOYEE_ROUTES.detail(employee.id)}
                       className="underline-offset-4 hover:underline focus-visible:underline"
+                      title={getFullName(employee)}
                     >
                       {getFullName(employee)}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell
+                    className="max-w-0 truncate text-muted-foreground"
+                    title={employee.email ?? undefined}
+                  >
                     {employee.email ?? <span aria-label="No email">—</span>}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">
+                  <TableCell
+                    className="whitespace-nowrap truncate"
+                    title={getCountryName(employee.countryCode)}
+                  >
                     {getCountryName(employee.countryCode)}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">
+                  <TableCell
+                    className="max-w-0 truncate"
+                    title={employee.department}
+                  >
                     {employee.department}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">
+                  <TableCell
+                    className="max-w-0 truncate"
+                    title={employee.jobTitle}
+                  >
                     {employee.jobTitle}
                   </TableCell>
                   <TableCell>

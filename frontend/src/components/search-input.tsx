@@ -49,9 +49,13 @@ export function SearchInput({
 
   // Adopt outside changes to `value` during render (React's recommended
   // alternative to syncing state in an effect).
+  // Always accept an empty value so an external "Clear filters" resets the
+  // input even when the user has a pending, not-yet-committed edit.
   if (value !== syncedValue) {
     setSyncedValue(value);
-    if (!isPending) {
+    if (!isPending || value === "") {
+      debounced.cancel();
+      setIsPending(false);
       setText(value);
     }
   }
@@ -81,6 +85,7 @@ export function SearchInput({
         <InputGroupInput
           id={inputId}
           type="search"
+          className="[&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
           value={text}
           placeholder={placeholder}
           maxLength={maxLength}
@@ -95,7 +100,11 @@ export function SearchInput({
         />
         {text ? (
           <InputGroupAddon align="inline-end">
-            <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={handleClear}>
+            <InputGroupButton
+              size="icon-xs"
+              aria-label="Clear search"
+              onClick={handleClear}
+            >
               <XIcon aria-hidden="true" />
             </InputGroupButton>
           </InputGroupAddon>

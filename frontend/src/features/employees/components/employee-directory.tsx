@@ -2,7 +2,7 @@
 
 import { PlusIcon, SearchXIcon, UsersIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -44,6 +44,21 @@ export function EmployeeDirectory() {
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
     null,
   );
+
+  // Measure the sticky filter bar's height so the table header can stick
+  // directly below it (dashboard header = 56 px / h-14).
+  const DASHBOARD_HEADER_H = 56;
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  const [filterBarH, setFilterBarH] = useState(80);
+  useEffect(() => {
+    const el = filterBarRef.current;
+    if (!el) return;
+    const measure = () => setFilterBarH(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const pages = employees.data?.pages ?? [];
   const rows = pages.flatMap((page) => page.data);
@@ -97,13 +112,19 @@ export function EmployeeDirectory() {
       />
 
       <div className="flex flex-col gap-6 p-1">
-        <EmployeeFilters
-          filters={filters}
-          options={options.data}
-          hasActiveFilters={hasActiveFilters}
-          onChange={changeFilters}
-          onClear={clearFilters}
-        />
+        {/* Sticky filter bar — sits just below the 56 px dashboard header */}
+        <div
+          ref={filterBarRef}
+          className="sticky top-14 z-20 bg-background pb-3 pt-1"
+        >
+          <EmployeeFilters
+            filters={filters}
+            options={options.data}
+            hasActiveFilters={hasActiveFilters}
+            onChange={changeFilters}
+            onClear={clearFilters}
+          />
+        </div>
 
         {failedFirstPage ? (
           <QueryError
@@ -138,6 +159,7 @@ export function EmployeeDirectory() {
               isRefreshing={isRefreshing}
               skeletonRows={10}
               onDelete={setEmployeeToDelete}
+              tableHeadTop={DASHBOARD_HEADER_H + filterBarH}
             />
             {!isFirstLoad && total !== undefined ? (
               <EmployeeListFooter
