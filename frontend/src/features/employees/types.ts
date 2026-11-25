@@ -71,7 +71,12 @@ export interface EmployeeListFilters {
 // Compensation
 // ---------------------------------------------------------------------------
 
-export type PayFrequency = "MONTHLY" | "SEMI_MONTHLY" | "BI_WEEKLY" | "WEEKLY" | "ANNUAL";
+export type PayFrequency =
+  | "MONTHLY"
+  | "SEMI_MONTHLY"
+  | "BI_WEEKLY"
+  | "WEEKLY"
+  | "ANNUAL";
 export type CompensationType =
   | "BASE_SALARY"
   | "BONUS"
@@ -103,10 +108,17 @@ export interface CompensationSnapshot {
   changeReason: string | null;
 }
 
+interface AuditLogChangedBy {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  email: string;
+}
 export interface AuditLogEntry {
   id: string;
   compensationRecordId: string;
   changedById: string | null;
+  changedBy: AuditLogChangedBy;
   changedAt: string;
   beforeValue: CompensationSnapshot | null;
   afterValue: CompensationSnapshot;

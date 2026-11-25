@@ -30,10 +30,18 @@ export interface CompensationResponse {
   updatedAt: Date;
 }
 
+export interface AuditLogChangedBy {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  email: string;
+}
+
 export interface AuditLogResponse {
   id: string;
   compensationRecordId: string;
   changedById: string | null;
+  changedBy: AuditLogChangedBy | null;
   changedAt: Date;
   beforeValue: CompensationSnapshot | null;
   afterValue: CompensationSnapshot;
@@ -86,11 +94,23 @@ export function toCompensationSnapshot(
   };
 }
 
-export function toAuditLogResponse(log: AuditLog): AuditLogResponse {
+export function toAuditLogResponse(
+  log: AuditLog & {
+    changedBy: { id: string; firstName: string; lastName: string | null; email: string } | null;
+  },
+): AuditLogResponse {
   return {
     id: log.id,
     compensationRecordId: log.compensationRecordId,
     changedById: log.changedById ?? null,
+    changedBy: log.changedBy
+      ? {
+          id: log.changedBy.id,
+          firstName: log.changedBy.firstName,
+          lastName: log.changedBy.lastName ?? null,
+          email: log.changedBy.email,
+        }
+      : null,
     changedAt: log.changedAt,
     beforeValue: (log.beforeValue as unknown as CompensationSnapshot | null) ?? null,
     afterValue: log.afterValue as unknown as CompensationSnapshot,

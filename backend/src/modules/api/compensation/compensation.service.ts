@@ -249,6 +249,7 @@ export class CompensationService {
     const log = await this.prisma.auditLog.findFirst({
       where: { compensationRecordId: recordId },
       orderBy: { changedAt: 'desc' },
+      include: { changedBy: true },
     });
     if (!log) {
       throw new NotFoundException(COMPENSATION_MESSAGES.auditNotFound);

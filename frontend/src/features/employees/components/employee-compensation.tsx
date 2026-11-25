@@ -1,6 +1,13 @@
 "use client";
 
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, PencilIcon, PlusIcon, ReceiptTextIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PencilIcon,
+  PlusIcon,
+  ReceiptTextIcon,
+} from "lucide-react";
 import { useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -19,9 +26,17 @@ import {
 import { formatDate, formatDateTime } from "@/lib/format";
 import { cn } from "cn";
 
-import { useCompensationAuditLog, useCompensationRecords, COMPENSATION_PAGE_SIZE } from "../hooks";
+import {
+  useCompensationAuditLog,
+  useCompensationRecords,
+  COMPENSATION_PAGE_SIZE,
+} from "../hooks";
 import { EditEndDateDialog } from "./edit-end-date-dialog";
-import type { AuditLogEntry, CompensationRecord, CompensationSnapshot } from "../types";
+import type {
+  AuditLogEntry,
+  CompensationRecord,
+  CompensationSnapshot,
+} from "../types";
 import { AddCompensationDialog } from "./add-compensation-dialog";
 
 // ---------------------------------------------------------------------------
@@ -47,8 +62,7 @@ const COMP_TYPE_LABELS: Record<string, string> = {
 const COMP_TYPE_COLORS: Record<string, string> = {
   BASE_SALARY:
     "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  BONUS:
-    "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  BONUS: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
   COMMISSION:
     "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
   EQUITY_GRANT:
@@ -117,14 +131,19 @@ function SnapshotCard({
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Frequency</dt>
-          <dd>{PAY_FREQUENCY_LABELS[snapshot.payFrequency] ?? snapshot.payFrequency}</dd>
+          <dd>
+            {PAY_FREQUENCY_LABELS[snapshot.payFrequency] ??
+              snapshot.payFrequency}
+          </dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Effective</dt>
           <dd>
             {formatDate(snapshot.effectiveFrom)}
             <span className="mx-1 text-muted-foreground">→</span>
-            {snapshot.effectiveTo ? formatDate(snapshot.effectiveTo) : "Ongoing"}
+            {snapshot.effectiveTo
+              ? formatDate(snapshot.effectiveTo)
+              : "Ongoing"}
           </dd>
         </div>
         {snapshot.changeReason ? (
@@ -145,7 +164,10 @@ function AuditLogPanel({
   employeeId: string;
   recordId: string;
 }) {
-  const { data, isPending, isError } = useCompensationAuditLog(employeeId, recordId);
+  const { data, isPending, isError } = useCompensationAuditLog(
+    employeeId,
+    recordId,
+  );
 
   if (isPending) {
     return (
@@ -166,7 +188,7 @@ function AuditLogPanel({
       <p className="text-xs text-muted-foreground">
         Recorded {formatDateTime(String(data.changedAt))}
         {data.changedById
-          ? ` · by ${data.changedById.slice(0, 8)}…`
+          ? ` · by ${data.changedBy?.firstName} ${data.changedBy?.lastName || ""}`
           : " · by system"}
       </p>
       <div className="grid gap-6 sm:grid-cols-2">
@@ -296,7 +318,11 @@ function getPageNumbers(current: number, total: number): (number | "...")[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const pages: (number | "...")[] = [1];
   if (current > 3) pages.push("...");
-  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) {
+  for (
+    let p = Math.max(2, current - 1);
+    p <= Math.min(total - 1, current + 1);
+    p++
+  ) {
     pages.push(p);
   }
   if (current < total - 2) pages.push("...");
@@ -344,7 +370,10 @@ function CompensationPagination({
           </Button>
           {pages.map((p, i) =>
             p === "..." ? (
-              <span key={`ellipsis-${i}`} className="flex size-8 items-center justify-center text-sm text-muted-foreground">
+              <span
+                key={`ellipsis-${i}`}
+                className="flex size-8 items-center justify-center text-sm text-muted-foreground"
+              >
                 …
               </span>
             ) : (
@@ -384,83 +413,85 @@ function CompensationPagination({
 
 export function EmployeeCompensation({ employeeId }: { employeeId: string }) {
   const [page, setPage] = useState(1);
-  const { data, isPending, isError, error, refetch } =
-    useCompensationRecords(employeeId, page);
+  const { data, isPending, isError, error, refetch } = useCompensationRecords(
+    employeeId,
+    page,
+  );
   const [addOpen, setAddOpen] = useState(false);
 
   return (
     <>
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>
-          <h2>Compensation history</h2>
-        </CardTitle>
-        <Button size="sm" onClick={() => setAddOpen(true)}>
-          <PlusIcon aria-hidden="true" />
-          Add record
-        </Button>
-      </CardHeader>
-      <CardContent className="p-0">
-        {isPending ? (
-          <div className="space-y-3 p-6">
-            {Array.from({ length: 3 }, (_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
-        ) : isError ? (
-          <div className="p-6">
-            <QueryError
-              title="Unable to load compensation records"
-              error={error}
-              onRetry={() => void refetch()}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>
+            <h2>Compensation history</h2>
+          </CardTitle>
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <PlusIcon aria-hidden="true" />
+            Add record
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isPending ? (
+            <div className="space-y-3 p-6">
+              {Array.from({ length: 3 }, (_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : isError ? (
+            <div className="p-6">
+              <QueryError
+                title="Unable to load compensation records"
+                error={error}
+                onRetry={() => void refetch()}
+              />
+            </div>
+          ) : !data?.data.length ? (
+            <EmptyState
+              icon={ReceiptTextIcon}
+              title="No compensation records"
+              description="No compensation records have been added for this employee yet."
             />
-          </div>
-        ) : !data?.data.length ? (
-          <EmptyState
-            icon={ReceiptTextIcon}
-            title="No compensation records"
-            description="No compensation records have been added for this employee yet."
-          />
-        ) : (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Frequency</TableHead>
-                  <TableHead>Effective period</TableHead>
-                  <TableHead>Change reason</TableHead>
-                  <TableHead className="text-right">Audit</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.data.map((record) => (
-                  <CompensationRow
-                    key={record.id}
-                    record={record}
-                    employeeId={employeeId}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-            <CompensationPagination
-              page={data.meta.page}
-              totalPages={data.meta.totalPages}
-              total={data.meta.total}
-              pageSize={COMPENSATION_PAGE_SIZE}
-              onPageChange={setPage}
-            />
-          </>
-        )}
-      </CardContent>
-    </Card>
-    <AddCompensationDialog
-      employeeId={employeeId}
-      open={addOpen}
-      onOpenChange={setAddOpen}
-      onSuccess={() => setPage(1)}
-    />
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Frequency</TableHead>
+                    <TableHead>Effective period</TableHead>
+                    <TableHead>Change reason</TableHead>
+                    <TableHead className="text-right">Audit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.data.map((record) => (
+                    <CompensationRow
+                      key={record.id}
+                      record={record}
+                      employeeId={employeeId}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+              <CompensationPagination
+                page={data.meta.page}
+                totalPages={data.meta.totalPages}
+                total={data.meta.total}
+                pageSize={COMPENSATION_PAGE_SIZE}
+                onPageChange={setPage}
+              />
+            </>
+          )}
+        </CardContent>
+      </Card>
+      <AddCompensationDialog
+        employeeId={employeeId}
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onSuccess={() => setPage(1)}
+      />
     </>
   );
 }
