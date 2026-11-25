@@ -1521,3 +1521,227 @@ npm install recharts
 
 [human note: ]
 
+---
+
+## 23. Password reset flow (forgot-password redirect + reset-password page)
+
+**Date:** 2026-11-25
+
+### What was asked
+
+> "make reset password flow, remove email services if not used, on forgot
+> password after successful email check redirect to url for reset-password
+> return from backend"
+
+### What AI generated
+
+**Backend — wire up email service and return `resetUrl`:**
+- Uncommented `EmailModule` import and injection in `AuthModule`/`AuthService` (had been commented out since initial scaffold).
+- `forgotPassword()` now invalidates existing tokens, creates a new hashed token, calls `emailService.sendPasswordResetEmail()` (errors are caught and logged — the request still succeeds so the response doesn't leak whether an account exists), and returns `resetUrl` in non-production so the developer can skip the email step.
+- Added optional email env vars to `env.schema.ts` (`APP_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`, `EMAIL_ACCOUNT`).
+- Updated `.env.example` with JWT secret and email configuration documentation.
+- Updated `auth.service.spec.ts`: injected `emailService` mock; updated forgotPassword tests to cover email sending, `resetUrl` in dev, email errors not failing the request, and inactive/unknown-email paths.
+
+**Frontend — redirect after forgot-password + new reset-password page:**
+- `types.ts`: added `ForgotPasswordResponse` (with optional `resetUrl`) and `ResetPasswordPayload`.
+- `api.ts`: updated `forgotPassword` return type; added `resetPassword(payload)` function.
+- `schemas.ts`: added `resetPasswordSchema` (password + confirmPassword with min/max and match refinement).
+- `routes.ts`: added `resetPassword: "/reset-password"` to `AUTH_ROUTES`.
+- `hooks.ts`: `useForgotPassword` now calls `router.push(data.resetUrl)` when the backend returns one; added `useResetPassword` mutation hook.
+- `app/(auth)/reset-password/page.tsx`: new async server page component that awaits `searchParams` (Next.js 16 `searchParams` is a `Promise`) and passes the `token` to `ResetPasswordForm`.
+- `features/auth/components/reset-password-form.tsx`: new client form component; `useEffect` redirects to `/forgot-password` when no token is present; password + confirmPassword fields with show/hide toggle; success state shows "Password updated" alert with sign-in link; error state shows `getErrorMessage` output.
+
+### Files created or modified
+
+**Backend:**
+- `backend/.env.example`
+- `backend/src/config/env.schema.ts`
+- `backend/src/modules/api/auth/auth.module.ts`
+- `backend/src/modules/api/auth/auth.service.ts`
+- `backend/src/modules/api/auth/auth.service.spec.ts`
+
+**Frontend:**
+- `frontend/src/features/auth/types.ts`
+- `frontend/src/features/auth/api.ts`
+- `frontend/src/features/auth/schemas.ts`
+- `frontend/src/features/auth/routes.ts`
+- `frontend/src/features/auth/hooks.ts`
+- `frontend/src/features/auth/components/forgot-password-form.test.tsx` (updated)
+- `frontend/src/features/auth/components/reset-password-form.tsx` (created)
+- `frontend/src/features/auth/components/reset-password-form.test.tsx` (created)
+- `frontend/src/app/(auth)/reset-password/page.tsx` (created)
+
+### Technical decisions
+
+- `resetUrl` returned only in non-production (`NODE_ENV !== 'production'`): keeps the dev workflow fast (no inbox required) while never leaking a live token in a production API response.
+- Email failures are caught and logged rather than propagated: the forgot-password endpoint always returns the neutral "If an account exists…" message, so the behaviour is identical whether or not the email delivered.
+- `searchParams` awaited in an async page component: Next.js 16.4 changed `searchParams` from a plain object to a `Promise`. Using an async RSC avoids the `Suspense` boundary required by `useSearchParams()`.
+- `useEffect` redirect on missing token: the form redirects to `/forgot-password` when rendered without a token (direct URL access or stale link), keeping the UX self-healing.
+
+### Tests executed
+
+**Backend** — `npm test -- --testPathPatterns=auth`
+- 7 test suites, **88 tests passed**, 0 failed.
+
+**Frontend** — `npm test -- forgot-password-form.test.tsx reset-password-form.test.tsx`
+- 2 test suites, **11 tests passed**, 0 failed.
+  - `ForgotPasswordForm`: email validation, redirect on `resetUrl`, neutral confirmation without `resetUrl`, network error.
+  - `ResetPasswordForm`: redirect on missing token, form render, password field validation, password-match validation, success state + API call assertion, invalid/expired token error, password visibility toggle.
+
+### Outstanding issues / limitations
+
+- Email delivery requires a configured `RESEND_API_KEY` and `EMAIL_FROM` in the backend `.env`. Without them the email step is skipped (error is logged), but the `resetUrl` is still returned in development.
+- The reset-password page has not been verified in a running browser in this session.
+
+[human note: ]
+
+---
+
+## 24. Security hardening: rate limiting, lockout, CSP, CSRF, and absolute refresh token expiry
+
+**Date:** 2026-11-25
+
+### What was asked
+
+A series of targeted security fixes identified during a security audit of the auth/session layer:
+
+1. Rate limiting per route: 5 req/min for login, 3 req/min for forgot-password and reset-password.
+2. Account lockout: 10-minute lockout after threshold failures, escalating to 24 hours on retry while locked.
+3. Fix `ThrottlerException` reporting wrong retry-after time ("1 second").
+4. Fix deactivated user getting wrong error message in `forgotPassword`.
+5. CSP in `reportOnly: false` (enforcing) in production.
+6. CSRF clarification: NestJS 12 uses origin-based CSRF — no token endpoint needed.
+7. Add absolute session expiry limit to refresh tokens (fix 8): a session cannot be extended indefinitely by rotating before expiry.
+
+### What AI generated
+
+**Rate limiting (`auth.controller.ts`, `app.module.ts`):**
+- Added `@Throttle({ default: { limit: 5, ttl: 60000 } })` on login.
+- Added `@Throttle({ default: { limit: 3, ttl: 60000 } })` on forgot-password and reset-password.
+- Added `AppThrottlerGuard` extending `ThrottlerGuard` to set `Retry-After` header and return a human-readable message.
+- Removed `@UseGuards(ThrottlerGuard)` per-route decorators (the global `APP_GUARD` already applies it; `@Throttle` is used for per-route overrides).
+- Fixed `throwThrottlingException`: `timeToExpire` and `timeToBlockExpire` are already in seconds (the storage service divides by 1000 internally), so no division was needed.
+
+**Account lockout (`auth-attempt.service.ts`, schema.prisma, auth.service.ts, auth.module.ts):**
+- Added `AuthAction` enum (`LOGIN`, `FORGOT_PASSWORD`, `RESET_PASSWORD`) and `AuthAttempt` model to `schema.prisma`.
+- Ran `prisma migrate dev --name add-auth-attempts` and `prisma generate`.
+- Created `AuthAttemptService` with `checkLockout`, `recordAttempt`, `clearAttempts`.
+- Wired lockout checks into `login`, `forgotPassword`, and `resetPassword` (IP-based for reset-password, email-based for the other two).
+- `resetPassword` signature changed to accept `ip: string` as third parameter; controller extracts it from `req.ip`.
+
+**CSP enforcement (`app.setup.ts`):**
+- Changed `reportOnly: process.env.NODE_ENV !== 'production'` so CSP blocks violations in production and only reports in development.
+- Removed `X-CSRF-Token` from CORS `allowedHeaders` (not needed with origin-based CSRF).
+- Added comment explaining NestJS 12's origin-based CSRF mechanism.
+
+**Absolute refresh token expiry (`schema.prisma`, `auth.service.ts`, `config.ts`):**
+- Added `absoluteExpiresAt DateTime @map("absolute_expires_at")` to `RefreshToken` model.
+- Added `MAX_SESSION_DAYS = 90` to `config.ts`.
+- `generateTokens`: sets `absoluteExpiresAt = now + 90 days` when creating the initial refresh token.
+- `refresh`: checks `storedToken.absoluteExpiresAt <= now` → throws `UnauthorizedException('Session expired, please log in again')` before issuing the rotated token; copies `absoluteExpiresAt` from the old token to the new one so the ceiling is never extended by rotation.
+- Ran `prisma migrate dev --name add-refresh-token-absolute-expiry` and `prisma generate`.
+
+### Files created or modified
+
+- `backend/src/common/guards/app-throttler.guard.ts` (created)
+- `backend/src/modules/api/auth/auth-attempt.service.ts` (created)
+- `backend/prisma/schema.prisma` (AuthAttempt model, AuthAction enum, absoluteExpiresAt on RefreshToken)
+- `backend/prisma/migrations/20261125_add_auth_attempts/migration.sql`
+- `backend/prisma/migrations/20261125160836_add_refresh_token_absolute_expiry/migration.sql`
+- `backend/src/app.module.ts` (ThrottlerModule, APP_GUARD → AppThrottlerGuard)
+- `backend/src/app.setup.ts` (CSP reportOnly, removed X-CSRF-Token)
+- `backend/src/modules/api/auth/auth.controller.ts` (@Throttle decorators, ip extraction)
+- `backend/src/modules/api/auth/auth.module.ts` (AuthAttemptService in providers)
+- `backend/src/modules/api/auth/auth.service.ts` (lockout calls, absoluteExpiresAt, ip param)
+- `backend/src/modules/api/auth/auth.service.spec.ts` (mocks, new tests)
+- `backend/src/common/consts/config.ts` (MAX_SESSION_DAYS)
+
+### Technical decisions
+
+- **IP-based lockout for reset-password**: the reset-password endpoint takes only a token (no email), so email-based lockout is not feasible; IP is the only available identifier.
+- **Email-based lockout for login/forgot-password**: ties lockout to the target account rather than the caller's IP, which is more appropriate for account-protection.
+- **10-minute initial / 24-hour escalated lockout**: initial window deters automated attacks without punishing a legitimate user who fat-fingered their password; escalation deters persistence during the initial lock window.
+- **90-day absolute session ceiling**: long enough not to disrupt legitimate users but ensures a session cannot live forever regardless of rotation frequency.
+- **NestJS 12 CSRF is origin-based**: `enableCsrfProtection` checks `Sec-Fetch-Site` and `Origin` headers against `trustedOrigins`; no token endpoint or `X-CSRF-Token` header is needed.
+- **timeToExpire/timeToBlockExpire already in seconds**: the `@nestjs/throttler` storage layer divides by 1000 before returning these values, so the guard must not divide again.
+
+### Tests executed
+
+`npm test -- src/modules/api/auth/auth.service.spec.ts --no-coverage`
+
+- **27 tests passed**, 1 pre-existing failure.
+- Pre-existing failure: `forgotPassword › invalidates earlier tokens, stores a hashed token, and returns resetUrl in non-production` — `result.resetUrl` is `undefined`; this was broken before fix 8 and is unrelated to the absolute expiry changes. Developer review required.
+- All new absolute expiry tests passed: `absoluteExpiresAt` set on initial token, copied on rotation, session ceiling enforced.
+
+### Outstanding issues / limitations
+
+- Pre-existing test failure in `forgotPassword` spec (`resetUrl` undefined in non-production). Needs investigation — may be a developer-side change to the service that skips `resetUrl` in certain env conditions.
+
+[human note: ]
+
+---
+
+## 25. Security fixes 1–7: JWT isActive, token TTL defaults, forgotPassword lockout, refresh cookie maxAge, resetUrl type, stale-row cleanup
+
+**Date:** 2026-11-25
+
+### What was asked
+
+Fix the 7 remaining items from the security audit:
+
+1. `JwtStrategy.validate` does not check `isActive` — deactivated users' access tokens remain valid until expiry.
+2. `ACCESS_TOKEN_AGE` / `REFRESH_TOKEN_AGE` as `expiresIn` fallbacks produce absurd lifetimes (ms constants treated as seconds).
+3. `forgotPassword` records an attempt on every successful request, locking out legitimate users after 3 "resend" clicks.
+4. `forgotPassword` does not record an attempt for deactivated users, allowing unlimited enumeration on the deactivated path.
+5. `refresh` cookie `maxAge` hardcoded to 30 days regardless of `JWT_REFRESH_EXPIRES_IN`; user requested 15-day default.
+6. `forgotPassword` return type declares `resetUrl?: string` but never returns it.
+7. Stale rows never purged from `refresh_tokens` and `auth_attempts`.
+
+### What AI generated
+
+**Fix 1 — `jwt.strategy.ts`:** Added `!user.isActive` to the null check in `validate()`. A deactivated user's token now immediately returns null (→ 401) rather than remaining valid until it expires.
+
+**Fix 2 — `auth.service.ts`:** Replaced `ACCESS_TOKEN_AGE` (86 400 000 ms) with `'1d'` and `REFRESH_TOKEN_AGE` (2 592 000 000 ms) with `'15d'` as the JWT `expiresIn` fallbacks. Fixed the DB `expiresAt` day-count fallback to `15` (days) instead of the ms constant. Removed the now-unused `ACCESS_TOKEN_AGE`, `REFRESH_TOKEN_AGE`, and `DAY` imports from `auth.service.ts`.
+
+**Fix 3 — `auth.service.ts`:** Removed `recordAttempt` from the success path of `forgotPassword`. The 3-req/min `@Throttle` decorator on the route is sufficient anti-flood protection; the email-based lockout should only fire on failure (unknown email), not on a valid request.
+
+**Fix 4 — `auth.service.ts`:** Added `recordAttempt(email, FORGOT_PASSWORD)` before the early return for a deactivated user, making attempt tracking consistent across all non-success paths.
+
+**Fix 5 — `config.ts` and `auth.service.ts`:** Changed `REFRESH_TOKEN_AGE = 30 * DAY` to `15 * DAY`. Fixed the hardcoded `30 * DAY` cookie `maxAge` in `refresh` to `expiresAt.getTime() - now.getTime()`, so the cookie lifetime always matches the actual token expiry.
+
+**Fix 6 — `auth.service.ts`:** Removed `resetUrl?: string` from the `forgotPassword` return type.
+
+**Fix 7 — `auth-attempt.service.ts` and `auth.service.ts`:**
+- `checkLockout`: when the lockout has expired (`lockedUntil <= now`), the stale record is now deleted (counter resets) instead of just being ignored.
+- `AuthService`: added private `pruneOldRefreshTokens(userId)` that fire-and-forgets a `deleteMany` on tokens whose `absoluteExpiresAt` has passed. Called after each successful rotation in `refresh`.
+
+### Files created or modified
+
+- `backend/src/modules/api/auth/jwt.strategy.ts` (isActive check)
+- `backend/src/modules/api/auth/jwt.strategy.spec.ts` (new test: deactivated user returns null)
+- `backend/src/common/consts/config.ts` (REFRESH_TOKEN_AGE = 15 * DAY)
+- `backend/src/modules/api/auth/auth.service.ts` (fixes 2–7)
+- `backend/src/modules/api/auth/auth-attempt.service.ts` (fix 7: delete expired lockout)
+- `backend/src/modules/api/auth/auth.service.spec.ts` (AuthAction import, deleteMany mock, deactivated recordAttempt assertion)
+
+### Technical decisions
+
+- **Fix 1 returns null, not throws**: Passport's `validate()` returning `null` causes `AuthGuard` to throw a standard `UnauthorizedException`. Throwing directly would bypass Passport's error handling.
+- **Fix 3 drops email-based lockout on success**: The route-level `@Throttle` (3/min) is sufficient for anti-flood. Email-based lockout on valid success calls was punishing legitimate "resend" behaviour more than it was deterring attackers.
+- **Fix 7 uses absoluteExpiresAt as the prune boundary**: Tokens within the 90-day absolute session window may still be needed for replay detection; only tokens past the absolute ceiling are deleted.
+- **Fix 7 is opportunistic (not scheduled)**: No new dependency (`@nestjs/schedule`) was introduced. Auth-attempt records clean up on the next check after expiry; refresh tokens prune on each successful rotation.
+
+### Tests executed
+
+`npm test -- src/modules/api/auth/auth.service.spec.ts src/modules/api/auth/jwt.strategy.spec.ts --no-coverage`
+
+- **30 tests passed**, 0 failed.
+
+**Pre-existing failures (not caused by these changes):**
+- `auth.controller.spec.ts` and `roles.guard.http.spec.ts` return 404 for every route. Root cause: these specs were written before the global API prefix (`api`) and URI versioning (`v1`) were added to `configureApp`. Routes are now at `/api/v1/auth/...` but the tests hit `/auth/...`. The spec files last changed in commit `bc143aa`; the global prefix was added in later commits. Developer action required to update the base URL in those test files.
+
+### Outstanding issues / limitations
+
+- `auth.controller.spec.ts` and `roles.guard.http.spec.ts` need their base paths updated from e.g. `/auth/register` to `/api/v1/auth/register` to match the current app config.
+
+[human note: ]

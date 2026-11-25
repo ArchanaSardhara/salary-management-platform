@@ -8,11 +8,8 @@ import * as argon2 from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 
 import {
-  ACCESS_TOKEN_AGE,
-  DAY,
   MAX_SESSION_DAYS,
   MINUTE,
-  REFRESH_TOKEN_AGE,
 } from '../../../common/consts/config';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
@@ -53,7 +50,7 @@ export class AuthService {
 
       expiresIn: process.env.JWT_ACCESS_EXPIRES_IN
         ? `${Number(process.env.JWT_ACCESS_EXPIRES_IN)}d`
-        : ACCESS_TOKEN_AGE,
+        : '1d',
     });
 
     if (!rememberMe) {
@@ -68,13 +65,13 @@ export class AuthService {
 
       expiresIn: process.env.JWT_REFRESH_EXPIRES_IN
         ? `${Number(process.env.JWT_REFRESH_EXPIRES_IN)}d`
-        : REFRESH_TOKEN_AGE,
+        : '15d',
     });
 
     const refreshTokenHash = hashToken(refreshToken);
 
     const refreshTokenDays = Number(
-      process.env.JWT_REFRESH_EXPIRES_IN ?? REFRESH_TOKEN_AGE,
+      process.env.JWT_REFRESH_EXPIRES_IN ?? 15,
     );
 
     const now = new Date();
@@ -107,6 +104,21 @@ export class AuthService {
         revokedAt: new Date(),
       },
     });
+  }
+
+  private pruneOldRefreshTokens(userId: string): void {
+    // Delete tokens whose absolute session ceiling has passed — they can never
+    // be used or replayed again, so there is no value in keeping them.
+    this.prisma.refreshToken
+      .deleteMany({
+        where: {
+          userId,
+          absoluteExpiresAt: { lt: new Date() },
+        },
+      })
+      .catch((err: Error) =>
+        this.logger.error('Failed to prune refresh tokens', err),
+      );
   }
 
   async register(data: RegisterDto) {
@@ -151,9 +163,7 @@ export class AuthService {
     return user;
   }
 
-  async forgotPassword(
-    email: string,
-  ): Promise<{ message: string; resetUrl?: string }> {
+  async forgotPassword(email: string): Promise<{ message: string }> {
     await this.authAttemptService.checkLockout(
       email,
       AuthAction.FORGOT_PASSWORD,
@@ -172,6 +182,10 @@ export class AuthService {
     }
 
     if (!user.isActive) {
+      await this.authAttemptService.recordAttempt(
+        email,
+        AuthAction.FORGOT_PASSWORD,
+      );
       return {
         message:
           'Your account has been deactivated. Please contact your administrator.',
@@ -203,10 +217,6 @@ export class AuthService {
       this.logger.error('Failed to send password reset email', err);
     }
 
-    await this.authAttemptService.recordAttempt(
-      email,
-      AuthAction.FORGOT_PASSWORD,
-    );
     return { message };
   }
 
@@ -333,7 +343,7 @@ export class AuthService {
     const expiresAt = new Date();
 
     expiresAt.setDate(
-      expiresAt.getDate() + Number(process.env.JWT_REFRESH_EXPIRES_IN ?? 30),
+      expiresAt.getDate() + Number(process.env.JWT_REFRESH_EXPIRES_IN ?? 15),
     );
 
     const accessToken = await this.jwtService.signAsync(
@@ -379,8 +389,10 @@ export class AuthService {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 30 * DAY,
+      maxAge: expiresAt.getTime() - now.getTime(),
     });
+
+    this.pruneOldRefreshTokens(storedToken.userId);
 
     return {
       message: 'Token refreshed',

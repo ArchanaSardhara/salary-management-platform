@@ -34,9 +34,9 @@ describe('validateEnv', () => {
   it.each(['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'])(
     'throws when %s is shorter than 32 characters',
     (key) => {
-      expect(() =>
-        validateEnv({ ...validConfig, [key]: 'too-short' }),
-      ).toThrow(/at least 32 characters/);
+      expect(() => validateEnv({ ...validConfig, [key]: 'too-short' })).toThrow(
+        /at least 32 characters/,
+      );
     },
   );
 
@@ -62,17 +62,13 @@ describe('validateEnv', () => {
   });
 
   it('throws when NODE_ENV is not one of the allowed values', () => {
-    expect(() =>
-      validateEnv({ ...validConfig, NODE_ENV: 'staging' }),
-    ).toThrow(/NODE_ENV/);
+    expect(() => validateEnv({ ...validConfig, NODE_ENV: 'staging' })).toThrow(
+      /NODE_ENV/,
+    );
   });
 
   it('throws when PORT is not a positive integer', () => {
-    expect(() => validateEnv({ ...validConfig, PORT: '-1' })).toThrow(
-      /PORT/,
-    );
-    expect(() => validateEnv({ ...validConfig, PORT: 'abc' })).toThrow(
-      /PORT/,
-    );
+    expect(() => validateEnv({ ...validConfig, PORT: '-1' })).toThrow(/PORT/);
+    expect(() => validateEnv({ ...validConfig, PORT: 'abc' })).toThrow(/PORT/);
   });
 });

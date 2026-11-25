@@ -54,7 +54,13 @@ export class AuthAttemptService {
     if (!record?.lockedUntil) return;
 
     const now = new Date();
-    if (record.lockedUntil <= now) return;
+    if (record.lockedUntil <= now) {
+      // Lockout has expired — delete the stale record so the counter resets.
+      await this.prisma.authAttempt.delete({
+        where: { identifier_action: { identifier, action } },
+      });
+      return;
+    }
 
     const config = CONFIGS[action];
     const escalatedUntil = new Date(now.getTime() + config.escalatedLockoutMs);

@@ -3,6 +3,7 @@ import type { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import type { Response } from 'express';
 import { Role } from '../../../common/authorization/role.enum';
+import { AuthAction } from '../../../generated/prisma/enums';
 import { hashToken } from '../../../common/utils/token.util';
 import type { EmailService } from '../notifications/email/email.service';
 import type { PrismaService } from '../../prisma/prisma.service';
@@ -41,6 +42,7 @@ describe('AuthService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
+      deleteMany: jest.fn(),
     },
     passwordResetToken: {
       create: jest.fn(),
@@ -83,6 +85,7 @@ describe('AuthService', () => {
         ),
     );
     prisma.$transaction.mockResolvedValue([]);
+    prisma.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
     emailService.sendPasswordResetEmail.mockResolvedValue(undefined);
     authAttemptService.checkLockout.mockResolvedValue(undefined);
     authAttemptService.recordAttempt.mockResolvedValue(undefined);
@@ -271,6 +274,10 @@ describe('AuthService', () => {
       expect(prisma.passwordResetToken.updateMany).not.toHaveBeenCalled();
       expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
       expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+      expect(authAttemptService.recordAttempt).toHaveBeenCalledWith(
+        user.email,
+        AuthAction.FORGOT_PASSWORD,
+      );
     });
   });
 

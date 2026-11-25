@@ -20,7 +20,7 @@ describe('JwtStrategy', () => {
   });
 
   it('returns the user for the token subject', async () => {
-    const user = { id: 'user-1', email: 'ada@example.com' };
+    const user = { id: 'user-1', email: 'ada@example.com', isActive: true };
     usersService.findById.mockResolvedValue(user);
 
     await expect(
@@ -34,6 +34,18 @@ describe('JwtStrategy', () => {
 
     await expect(
       strategy.validate({ sub: 'gone', email: 'gone@example.com' }),
+    ).resolves.toBeNull();
+  });
+
+  it('returns null when the user is deactivated', async () => {
+    usersService.findById.mockResolvedValue({
+      id: 'user-1',
+      email: 'ada@example.com',
+      isActive: false,
+    });
+
+    await expect(
+      strategy.validate({ sub: 'user-1', email: 'ada@example.com' }),
     ).resolves.toBeNull();
   });
 });
