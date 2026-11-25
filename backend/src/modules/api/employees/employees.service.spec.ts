@@ -7,7 +7,12 @@ import { Prisma } from '../../../generated/prisma/client';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { CreateEmployeeDto } from './dto/create-employee.dto';
 import type { ListEmployeesQueryDto } from './dto/list-employees-query.dto';
-import { EMPLOYEE_MESSAGES, EmployeesService } from './employees.service';
+import { parseEmployeeCode } from './employee.constants';
+import {
+  buildListWhere,
+  EMPLOYEE_MESSAGES,
+  EmployeesService,
+} from './employees.service';
 
 describe('EmployeesService', () => {
   const employeeModel = {
@@ -142,7 +147,7 @@ describe('EmployeesService', () => {
     ): ListEmployeesQueryDto => ({
       page: 1,
       pageSize: 20,
-      status: 'active',
+      status: ['active'],
       ...overrides,
     });
 
@@ -171,13 +176,14 @@ describe('EmployeesService', () => {
     });
 
     it.each([
-      ['deleted', { deletedAt: { not: null } }],
-      ['all', {}],
-    ] as const)('filters status=%s', async (status, where) => {
+      [['deleted'], { deletedAt: { not: null } }],
+      [['all'], {}],
+      [['active', 'deleted'], {}],
+    ] as const)('filters status=%j', async (status, where) => {
       employeeModel.findMany.mockResolvedValue([]);
       employeeModel.count.mockResolvedValue(0);
 
-      const result = await service.findAll(query({ status }));
+      const result = await service.findAll(query({ status: [...status] }));
 
       expect(employeeModel.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where }),
@@ -186,6 +192,105 @@ describe('EmployeesService', () => {
         data: [],
         meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
       });
+    });
+  });
+
+  describe('buildListWhere', () => {
+    const base = { status: ['active' as const] };
+    const textTerm = (term: string) => ({
+      OR: [
+        { firstName: { contains: term, mode: 'insensitive' } },
+        { lastName: { contains: term, mode: 'insensitive' } },
+        { email: { contains: term, mode: 'insensitive' } },
+      ],
+    });
+
+    it('returns only the status condition when no filters are given', () => {
+      expect(buildListWhere(base)).toEqual({ deletedAt: null });
+    });
+
+    it('matches any of several countries and departments', () => {
+      expect(
+        buildListWhere({
+          ...base,
+          countryCode: ['IN', 'US'],
+          department: ['Engineering', 'Finance'],
+        }),
+      ).toEqual({
+        AND: [
+          { deletedAt: null },
+          { countryCode: { in: ['IN', 'US'] } },
+          { department: { in: ['Engineering', 'Finance'] } },
+        ],
+      });
+    });
+
+    it('has no conditions when all statuses are selected and nothing else', () => {
+      expect(buildListWhere({ status: ['active', 'deleted'] })).toEqual({});
+      expect(buildListWhere({ status: ['all'] })).toEqual({});
+    });
+
+    it('omits the status condition when all statuses are selected', () => {
+      expect(
+        buildListWhere({ status: ['all'], department: ['Finance'] }),
+      ).toEqual({ department: { in: ['Finance'] } });
+    });
+
+    it('requires every search term to match a name or email', () => {
+      expect(buildListWhere({ ...base, search: 'priya  sharma' })).toEqual({
+        AND: [
+          { deletedAt: null },
+          { AND: [textTerm('priya'), textTerm('sharma')] },
+        ],
+      });
+    });
+
+    it.each([
+      ['EMP-000042', 42],
+      ['emp42', 42],
+      ['42', 42],
+    ])('also matches employee code %s exactly', (search, employeeNumber) => {
+      expect(buildListWhere({ ...base, search })).toEqual({
+        AND: [
+          { deletedAt: null },
+          { OR: [{ AND: [textTerm(search)] }, { employeeNumber }] },
+        ],
+      });
+    });
+  });
+
+  describe('parseEmployeeCode', () => {
+    it.each([
+      ['EMP-000042', 42],
+      ['emp-7', 7],
+      [' 15 ', 15],
+      ['priya', null],
+      ['EMP-', null],
+      ['1234567890', null],
+    ])('parses %s as %s', (term, expected) => {
+      expect(parseEmployeeCode(term)).toBe(expected);
+    });
+  });
+
+  describe('getOptions', () => {
+    it('returns ISO country codes, countries in use and fixed lists', async () => {
+      employeeModel.findMany.mockResolvedValue([
+        { countryCode: 'DE' },
+        { countryCode: 'IN' },
+      ]);
+
+      const result = await service.getOptions();
+
+      expect(employeeModel.findMany).toHaveBeenCalledWith({
+        distinct: ['countryCode'],
+        select: { countryCode: true },
+        orderBy: { countryCode: 'asc' },
+      });
+      expect(result.countriesInUse).toEqual(['DE', 'IN']);
+      expect(result.countryCodes).toContain('IN');
+      expect(result.countryCodes).toEqual([...result.countryCodes].sort());
+      expect(result.departments).toContain('Engineering');
+      expect(result.jobTitles).toContain('Software Engineer');
     });
   });
 

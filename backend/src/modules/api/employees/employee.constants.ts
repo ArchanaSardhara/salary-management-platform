@@ -48,3 +48,18 @@ export const MAX_PAGE_SIZE = 100;
 export function formatEmployeeCode(employeeNumber: number): string {
   return `EMP-${String(employeeNumber).padStart(6, '0')}`;
 }
+
+/** Max length of the directory search term. */
+export const SEARCH_MAX_LENGTH = 100;
+
+/** Matches an employee code ("EMP-000042", "emp42") or a bare number ("42"). */
+const EMPLOYEE_CODE_PATTERN = /^(?:EMP-?)?0*(\d{1,9})$/i;
+
+/**
+ * Parses a search term as an employee code. Returns the employee number, or
+ * null when the term is not a code. Nine digits keep it within Postgres int.
+ */
+export function parseEmployeeCode(term: string): number | null {
+  const match = EMPLOYEE_CODE_PATTERN.exec(term.trim());
+  return match ? Number(match[1]) : null;
+}

@@ -54,3 +54,13 @@ export function toEmployeeResponse(employee: Employee): EmployeeResponse {
     deletedAt: employee.deletedAt,
   };
 }
+
+/** Lookup values for the directory filters and the employee form. */
+export interface EmployeeOptionsResponse {
+  /** Every valid ISO 3166-1 alpha-2 code, for the create/edit form. */
+  countryCodes: string[];
+  /** Country codes that at least one employee (active or deleted) has. */
+  countriesInUse: string[];
+  departments: readonly string[];
+  jobTitles: readonly string[];
+}

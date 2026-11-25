@@ -23,6 +23,7 @@ describe('EmployeesController (HTTP)', () => {
     update: jest.fn(),
     softDelete: jest.fn(),
     restore: jest.fn(),
+    getOptions: jest.fn(),
   };
 
   /** Stands in for JwtAuthGuard: sets request.user from test state. */
@@ -213,7 +214,7 @@ describe('EmployeesController (HTTP)', () => {
       expect(service.findAll).toHaveBeenCalledWith({
         page: 1,
         pageSize: 20,
-        status: 'active',
+        status: ['active'],
       });
     });
 
@@ -228,7 +229,7 @@ describe('EmployeesController (HTTP)', () => {
       expect(service.findAll).toHaveBeenCalledWith({
         page: 2,
         pageSize: 50,
-        status: 'deleted',
+        status: ['deleted'],
       });
     });
 
@@ -237,9 +238,96 @@ describe('EmployeesController (HTTP)', () => {
       ['pageSize over 100', { pageSize: '101' }],
       ['non-numeric page', { page: 'abc' }],
       ['unknown status', { status: 'archived' }],
+      ['invalid country code', { countryCode: 'XX' }],
+      ['unknown department', { department: 'Space' }],
+      ['one invalid country among valid ones', 'countryCode=IN&countryCode=XX'],
+      ['one unknown status among valid ones', 'status=active&status=archived'],
+      ['search over 100 characters', { search: 'a'.repeat(101) }],
     ])('returns 400 for %s', async (_label, query) => {
       await http().get('/employees').query(query).expect(400);
       expect(service.findAll).not.toHaveBeenCalled();
+    });
+
+    it('passes normalised search and filters to the service', async () => {
+      service.findAll.mockResolvedValue({ data: [], meta: {} });
+
+      await http()
+        .get('/employees')
+        .query({ search: '  priya ', countryCode: 'in', department: 'Engineering' })
+        .expect(200);
+
+      expect(service.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          search: 'priya',
+          countryCode: ['IN'],
+          department: ['Engineering'],
+        }),
+      );
+    });
+
+    it('treats blank search and filters as not provided', async () => {
+      service.findAll.mockResolvedValue({ data: [], meta: {} });
+
+      await http()
+        .get('/employees')
+        .query({ search: '   ', countryCode: '', department: '' })
+        .expect(200);
+
+      const [query] = service.findAll.mock.calls[0] as [Record<string, unknown>];
+      expect(query.search).toBeUndefined();
+      expect(query.countryCode).toBeUndefined();
+      expect(query.department).toBeUndefined();
+    });
+  });
+
+  describe('GET /employees (multi-value filters)', () => {
+    it('accepts repeated keys, normalises and de-duplicates them', async () => {
+      service.findAll.mockResolvedValue({ data: [], meta: {} });
+
+      await http()
+        .get(
+          '/employees?countryCode=in&countryCode=US&countryCode=IN' +
+            '&department=Engineering&department=Finance' +
+            '&status=active&status=deleted',
+        )
+        .expect(200);
+
+      expect(service.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          countryCode: ['IN', 'US'],
+          department: ['Engineering', 'Finance'],
+          status: ['active', 'deleted'],
+        }),
+      );
+    });
+
+    it('drops blank values in a list', async () => {
+      service.findAll.mockResolvedValue({ data: [], meta: {} });
+
+      await http()
+        .get('/employees?department=&department=Finance')
+        .expect(200);
+
+      expect(service.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ department: ['Finance'] }),
+      );
+    });
+  });
+
+  describe('GET /employees/options', () => {
+    it('returns the lookup values (not treated as an employee id)', async () => {
+      const options = {
+        countryCodes: ['DE', 'IN'],
+        countriesInUse: ['IN'],
+        departments: ['Engineering'],
+        jobTitles: ['Software Engineer'],
+      };
+      service.getOptions.mockResolvedValue(options);
+
+      const res = await http().get('/employees/options').expect(200);
+
+      expect(res.body).toEqual(options);
+      expect(service.findOne).not.toHaveBeenCalled();
     });
   });
 

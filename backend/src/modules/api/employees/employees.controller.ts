@@ -17,6 +17,7 @@ import { RolesGuard } from '../../../common/authorization/roles.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import type {
+  EmployeeOptionsResponse,
   EmployeeResponse,
   PaginatedEmployeesResponse,
 } from './dto/employee-response.dto';
@@ -40,6 +41,12 @@ export class EmployeesController {
     @Query() query: ListEmployeesQueryDto,
   ): Promise<PaginatedEmployeesResponse> {
     return this.employeesService.findAll(query);
+  }
+
+  /** Lookup values for directory filters and the employee form. Declared before `:id`. */
+  @Get('options')
+  getOptions(): Promise<EmployeeOptionsResponse> {
+    return this.employeesService.getOptions();
   }
 
   @Get(':id')
