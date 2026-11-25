@@ -10,11 +10,24 @@ import { EmployeeDirectory } from "./employee-directory";
 let currentSearch = "";
 const replace = vi.fn();
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace, push: vi.fn(), refresh: vi.fn() }),
-  usePathname: () => "/employees",
-  useSearchParams: () => new URLSearchParams(currentSearch),
-}));
+vi.mock("@/hooks/use-search-params-state", async () => {
+  const { mergeSearchParams } = await import("@/lib/search-params");
+  return {
+    useSearchParamsState: (defaults: Record<string, unknown> = {}) => {
+      const searchParams = new URLSearchParams(currentSearch);
+      const setParams = (updates: Record<string, unknown>) => {
+        const next = mergeSearchParams(
+          new URLSearchParams(searchParams.toString()),
+          updates as Parameters<typeof mergeSearchParams>[1],
+          defaults as Parameters<typeof mergeSearchParams>[2],
+        );
+        const query = next.toString();
+        replace(query ? `/employees?${query}` : `/employees`, { scroll: false });
+      };
+      return { searchParams, setParams };
+    },
+  };
+});
 
 /** IntersectionObserver stand-in: tests decide when the sentinel is visible. */
 const observers = new Set<MockIntersectionObserver>();

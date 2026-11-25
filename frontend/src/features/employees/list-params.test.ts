@@ -18,6 +18,8 @@ describe("parseEmployeeListFilters", () => {
       countryCodes: [],
       departments: [],
       statuses: ["active"],
+      sortBy: "employeeNumber",
+      sortOrder: "asc",
     });
   });
 
@@ -29,6 +31,8 @@ describe("parseEmployeeListFilters", () => {
       countryCodes: ["IN", "US"],
       departments: ["Engineering", "Finance"],
       statuses: ["deleted"],
+      sortBy: "employeeNumber",
+      sortOrder: "asc",
     });
   });
 

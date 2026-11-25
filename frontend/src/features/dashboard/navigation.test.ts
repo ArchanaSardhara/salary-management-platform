@@ -35,8 +35,8 @@ describe("user display helpers", () => {
   });
 });
 describe("employee navigation", () => {
-  it("shows Employees to HR Managers only", () => {
+  it("shows Employees to both HR Managers and ADMINs", () => {
     expect(getNavItemsForRole("HR_MANAGER").map((item) => item.href)).toContain("/employees");
-    expect(getNavItemsForRole("ADMIN").map((item) => item.href)).not.toContain("/employees");
+    expect(getNavItemsForRole("ADMIN").map((item) => item.href)).toContain("/employees");
   });
 });
