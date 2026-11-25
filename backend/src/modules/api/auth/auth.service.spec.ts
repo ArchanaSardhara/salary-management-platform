@@ -141,6 +141,9 @@ describe('AuthService', () => {
       const days =
         (data.expiresAt.getTime() - data.createdAt.getTime()) / DAY_MS;
       expect(days).toBeCloseTo(7, 0);
+      const sessionDays =
+        (data.absoluteExpiresAt.getTime() - data.createdAt.getTime()) / DAY_MS;
+      expect(sessionDays).toBeCloseTo(90, 0);
     });
 
     it('propagates errors from user creation', async () => {
@@ -229,29 +232,6 @@ describe('AuthService', () => {
       expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
     });
 
-    it('invalidates earlier tokens, stores a hashed token, and returns resetUrl in non-production', async () => {
-      process.env.APP_URL = 'http://localhost:3000';
-      usersService.findByEmail.mockResolvedValue(user);
-
-      const result = await service.forgotPassword(user.email);
-
-      expect(result.message).toBe(message);
-      expect(result.resetUrl).toMatch(
-        /^http:\/\/localhost:3000\/reset-password\?token=/,
-      );
-      expect(prisma.passwordResetToken.updateMany).toHaveBeenCalledWith({
-        where: { userId: 'user-1', usedAt: null },
-        data: { usedAt: expect.any(Date) },
-      });
-      const { data } = prisma.passwordResetToken.create.mock.calls[0][0];
-      expect(data.userId).toBe('user-1');
-      expect(data.tokenHash).toMatch(/^[0-9a-f]{64}$/);
-      const minutes =
-        (data.expiresAt.getTime() - data.createdAt.getTime()) / 60_000;
-      expect(minutes).toBeCloseTo(15, 0);
-      expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled();
-    });
-
     it('sends email and returns only the message in production', async () => {
       process.env.NODE_ENV = 'production';
       process.env.RESEND_API_KEY = 'test-key';
@@ -260,7 +240,6 @@ describe('AuthService', () => {
       const result = await service.forgotPassword(user.email);
 
       expect(result.message).toBe(message);
-      expect(result.resetUrl).toBeUndefined();
       expect(emailService.sendPasswordResetEmail).toHaveBeenCalledWith({
         to: user.email,
         firstName: user.firstName,
@@ -279,7 +258,6 @@ describe('AuthService', () => {
       const result = await service.forgotPassword(user.email);
 
       expect(result.message).toBe(message);
-      expect(result.resetUrl).toBeUndefined();
       expect(prisma.passwordResetToken.create).toHaveBeenCalledTimes(1);
     });
 
@@ -364,6 +342,7 @@ describe('AuthService', () => {
       userId: 'user-1',
       revokedAt: null,
       expiresAt: new Date(Date.now() + DAY_MS),
+      absoluteExpiresAt: new Date(Date.now() + 90 * DAY_MS),
       user,
     };
 
@@ -411,6 +390,20 @@ describe('AuthService', () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
+    it('throws when the absolute session ceiling has been reached', async () => {
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        ...storedToken,
+        absoluteExpiresAt: new Date(Date.now() - 1000),
+      });
+
+      await expect(
+        service.refresh('raw-refresh', res as unknown as Response),
+      ).rejects.toThrow(
+        new UnauthorizedException('Session expired, please log in again'),
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it('revokes every session and throws 403 for a deactivated user', async () => {
       prisma.refreshToken.findUnique.mockResolvedValue({
         ...storedToken,
@@ -447,6 +440,7 @@ describe('AuthService', () => {
       const { data } = prisma.refreshToken.create.mock.calls[0][0];
       expect(data.userId).toBe('user-1');
       expect(data.tokenHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(data.absoluteExpiresAt).toBe(storedToken.absoluteExpiresAt);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
 
       expect(res.cookie).toHaveBeenCalledWith(

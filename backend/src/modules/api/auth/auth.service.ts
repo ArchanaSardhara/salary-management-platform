@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import {
   ACCESS_TOKEN_AGE,
   DAY,
+  MAX_SESSION_DAYS,
   MINUTE,
   REFRESH_TOKEN_AGE,
 } from '../../../common/consts/config';
@@ -78,8 +79,10 @@ export class AuthService {
 
     const now = new Date();
     const expiresAt = new Date();
+    const absoluteExpiresAt = new Date();
 
     expiresAt.setDate(expiresAt.getDate() + refreshTokenDays);
+    absoluteExpiresAt.setDate(absoluteExpiresAt.getDate() + MAX_SESSION_DAYS);
 
     await this.prisma.refreshToken.create({
       data: {
@@ -87,6 +90,7 @@ export class AuthService {
         userId: user.id,
         createdAt: now,
         expiresAt,
+        absoluteExpiresAt,
       },
     });
 
@@ -311,6 +315,10 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token expired');
     }
 
+    if (storedToken.absoluteExpiresAt <= new Date()) {
+      throw new UnauthorizedException('Session expired, please log in again');
+    }
+
     if (!storedToken.user.isActive) {
       await this.revokeAllUserTokens(storedToken.userId);
 
@@ -355,6 +363,7 @@ export class AuthService {
           userId: storedToken.user.id,
           createdAt: now,
           expiresAt,
+          absoluteExpiresAt: storedToken.absoluteExpiresAt,
         },
       }),
     ]);
