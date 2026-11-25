@@ -1,14 +1,26 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import { FormAlert } from "@/components/form/form-alert";
 import { SubmitButton } from "@/components/form/submit-button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { getErrorMessage } from "@/lib/api-client";
 
 import { useLogin } from "../hooks";
@@ -17,6 +29,7 @@ import { loginSchema, type LoginFormValues } from "../schemas";
 
 export function LoginForm() {
   const login = useLogin();
+  const [showPassword, setShowPassword] = useState(false);
   const {
     register,
     control,
@@ -42,7 +55,7 @@ export function LoginForm() {
 
         <Field data-invalid={!!errors.email}>
           <FieldLabel htmlFor="email">Email</FieldLabel>
-          <Input
+          <InputGroupInput
             id="email"
             type="email"
             autoComplete="email"
@@ -64,14 +77,29 @@ export function LoginForm() {
               Forgot password?
             </Link>
           </div>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            aria-invalid={!!errors.password}
-            aria-describedby={errors.password ? "password-error" : undefined}
-            {...register("password")}
-          />
+          <InputGroup>
+            <InputGroupInput
+              id="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? "password-error" : undefined}
+              {...register("password")}
+            />
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                size="icon-xs"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? (
+                  <EyeOffIcon aria-hidden="true" />
+                ) : (
+                  <EyeIcon aria-hidden="true" />
+                )}
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
           <FieldError id="password-error" errors={[errors.password]} />
         </Field>
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { useForm, type FieldError as RhfFieldError } from "react-hook-form";
 
 import { FormAlert } from "@/components/form/form-alert";
@@ -14,6 +16,12 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { getErrorMessage } from "@/lib/api-client";
 
 import { useRegister } from "../hooks";
@@ -27,6 +35,7 @@ function describedBy(id: string, error: RhfFieldError | undefined, extra?: strin
 
 export function RegisterForm() {
   const registerUser = useRegister();
+  const [showPassword, setShowPassword] = useState(false);
   const {
     register,
     handleSubmit,
@@ -106,14 +115,29 @@ export function RegisterForm() {
 
         <Field data-invalid={!!errors.password}>
           <FieldLabel htmlFor="password">Password</FieldLabel>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="new-password"
-            aria-invalid={!!errors.password}
-            aria-describedby={describedBy("password", errors.password, "password-hint")}
-            {...register("password")}
-          />
+          <InputGroup>
+            <InputGroupInput
+              id="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              aria-invalid={!!errors.password}
+              aria-describedby={describedBy("password", errors.password, "password-hint")}
+              {...register("password")}
+            />
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                size="icon-xs"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? (
+                  <EyeOffIcon aria-hidden="true" />
+                ) : (
+                  <EyeIcon aria-hidden="true" />
+                )}
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
           <FieldDescription id="password-hint">
             Between 8 and 20 characters.
           </FieldDescription>
