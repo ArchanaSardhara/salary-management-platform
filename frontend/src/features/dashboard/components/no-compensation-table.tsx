@@ -24,13 +24,15 @@ import { EMPLOYEE_ROUTES } from "@/features/employees/routes";
 import { useEmployeesWithoutCompensation } from "../hooks";
 
 export function NoCompensationTable() {
-  const { data, isLoading } = useEmployeesWithoutCompensation(10);
+  const { data, isLoading } = useEmployeesWithoutCompensation(5);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Employees Without Compensation</CardTitle>
-        <CardDescription>Active employees with no open-ended compensation record</CardDescription>
+        <CardDescription>
+          Active employees with no open-ended compensation record
+        </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         {isLoading ? (
@@ -41,7 +43,9 @@ export function NoCompensationTable() {
           </div>
         ) : !data?.length ? (
           <div className="flex h-40 items-center justify-center rounded-b-lg border-t">
-            <p className="text-sm text-muted-foreground">All active employees have compensation records</p>
+            <p className="text-sm text-muted-foreground">
+              All active employees have compensation records
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -51,7 +55,9 @@ export function NoCompensationTable() {
                   <TableHead>Employee</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Country</TableHead>
-                  <TableHead className="whitespace-nowrap">Start Date</TableHead>
+                  <TableHead className="whitespace-nowrap">
+                    Start Date
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

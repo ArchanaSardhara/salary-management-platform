@@ -6,6 +6,7 @@ import {
   getDashboardStats,
   getEmployeesWithoutCompensation,
   getHeadcountTrend,
+  getPayrollByCurrency,
   getPayrollByCountry,
   getPayrollByDepartment,
   getRecentChanges,
@@ -18,6 +19,7 @@ export const dashboardKeys = {
   stats: () => [...dashboardKeys.all, "stats"] as const,
   payrollByDepartment: (currency: string) => [...dashboardKeys.all, "payroll-dept", currency] as const,
   payrollByCountry: (currency: string) => [...dashboardKeys.all, "payroll-country", currency] as const,
+  payrollByCurrency: () => [...dashboardKeys.all, "payroll-currency"] as const,
   compensationTypeBreakdown: () => [...dashboardKeys.all, "comp-type"] as const,
   headcountTrend: () => [...dashboardKeys.all, "headcount"] as const,
   recentChanges: (limit: number) => [...dashboardKeys.all, "recent-changes", limit] as const,
@@ -56,10 +58,10 @@ export function useCompensationTypeBreakdown() {
   });
 }
 
-export function useHeadcountTrend() {
+export function useHeadcountTrend(startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: dashboardKeys.headcountTrend(),
-    queryFn: getHeadcountTrend,
+    queryKey: [...dashboardKeys.headcountTrend(), startDate, endDate],
+    queryFn: () => getHeadcountTrend(startDate, endDate),
     staleTime: STALE_TIME,
   });
 }
@@ -76,6 +78,14 @@ export function useEmployeesWithoutCompensation(limit = 10) {
   return useQuery({
     queryKey: dashboardKeys.noCompensation(limit),
     queryFn: () => getEmployeesWithoutCompensation(limit),
+    staleTime: STALE_TIME,
+  });
+}
+
+export function usePayrollByCurrency() {
+  return useQuery({
+    queryKey: dashboardKeys.payrollByCurrency(),
+    queryFn: getPayrollByCurrency,
     staleTime: STALE_TIME,
   });
 }

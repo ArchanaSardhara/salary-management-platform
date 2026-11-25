@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { CURRENCY_CODES } from '../../compensation/compensation.constants';
 
 export class DashboardCurrencyQueryDto {
@@ -20,4 +20,14 @@ export class DashboardLimitQueryDto {
   @Min(1)
   @Max(100)
   limit: number = 10;
+}
+
+export class HeadcountTrendQueryDto {
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
 }

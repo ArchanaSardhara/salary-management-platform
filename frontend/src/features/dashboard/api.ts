@@ -5,6 +5,7 @@ import type {
   DashboardStats,
   EmployeeWithoutCompensationItem,
   HeadcountTrend,
+  PayrollCurrencyItem,
   PayrollGroupItem,
   RecentChangeItem,
 } from "./types";
@@ -25,8 +26,10 @@ export function getCompensationTypeBreakdown(): Promise<CompensationTypeBreakdow
   return apiRequest<CompensationTypeBreakdown>("/dashboard/compensation-type-breakdown");
 }
 
-export function getHeadcountTrend(): Promise<HeadcountTrend> {
-  return apiRequest<HeadcountTrend>("/dashboard/headcount-trend");
+export function getHeadcountTrend(startDate?: string, endDate?: string): Promise<HeadcountTrend> {
+  return apiRequest<HeadcountTrend>(
+    `/dashboard/headcount-trend${toQueryString({ startDate, endDate })}`,
+  );
 }
 
 export function getRecentChanges(limit = 10): Promise<RecentChangeItem[]> {
@@ -37,4 +40,8 @@ export function getEmployeesWithoutCompensation(limit = 10): Promise<EmployeeWit
   return apiRequest<EmployeeWithoutCompensationItem[]>(
     `/dashboard/employees-without-compensation${toQueryString({ limit })}`,
   );
+}
+
+export function getPayrollByCurrency(): Promise<PayrollCurrencyItem[]> {
+  return apiRequest<PayrollCurrencyItem[]>("/dashboard/payroll-by-currency");
 }

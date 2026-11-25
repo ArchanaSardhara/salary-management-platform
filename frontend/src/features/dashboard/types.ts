@@ -25,14 +25,18 @@ export interface CompensationTypeBreakdown {
   total: number;
 }
 
-export interface HeadcountMonthItem {
-  month: string;
+export type HeadcountGranularity = "daily" | "weekly" | "monthly";
+
+export interface HeadcountPeriodItem {
+  /** "YYYY-MM-DD" for daily/weekly, "YYYY-MM" for monthly. */
+  period: string;
   active: number;
   newHires: number;
 }
 
 export interface HeadcountTrend {
-  months: HeadcountMonthItem[];
+  granularity: HeadcountGranularity;
+  periods: HeadcountPeriodItem[];
 }
 
 export interface RecentChangeItem {
@@ -47,6 +51,11 @@ export interface RecentChangeItem {
   beforeCurrency: string | null;
   afterAmount: string;
   afterCurrency: string;
+}
+
+export interface PayrollCurrencyItem {
+  currency: string;
+  count: number;
 }
 
 export interface EmployeeWithoutCompensationItem {

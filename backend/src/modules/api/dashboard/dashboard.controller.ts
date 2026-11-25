@@ -7,6 +7,7 @@ import { DashboardService } from './dashboard.service';
 import {
   DashboardCurrencyQueryDto,
   DashboardLimitQueryDto,
+  HeadcountTrendQueryDto,
 } from './dto/dashboard-query.dto';
 
 @Controller('dashboard')
@@ -38,8 +39,8 @@ export class DashboardController {
   }
 
   @Get('headcount-trend')
-  getHeadcountTrend() {
-    return this.dashboardService.getHeadcountTrend();
+  getHeadcountTrend(@Query() query: HeadcountTrendQueryDto) {
+    return this.dashboardService.getHeadcountTrend(query.startDate, query.endDate);
   }
 
   @Get('recent-changes')
@@ -50,5 +51,10 @@ export class DashboardController {
   @Get('employees-without-compensation')
   getEmployeesWithoutCompensation(@Query() query: DashboardLimitQueryDto) {
     return this.dashboardService.getEmployeesWithoutCompensation(query.limit);
+  }
+
+  @Get('payroll-by-currency')
+  getPayrollByCurrency() {
+    return this.dashboardService.getPayrollByCurrency();
   }
 }

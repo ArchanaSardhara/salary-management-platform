@@ -29,15 +29,18 @@ export interface CompensationTypeBreakdownResponse {
   total: number;
 }
 
-export interface HeadcountMonthItem {
-  /** ISO year-month, e.g. "2026-01". */
-  month: string;
+export type HeadcountGranularity = 'daily' | 'weekly' | 'monthly';
+
+export interface HeadcountPeriodItem {
+  /** "YYYY-MM-DD" for daily/weekly, "YYYY-MM" for monthly. */
+  period: string;
   active: number;
   newHires: number;
 }
 
 export interface HeadcountTrendResponse {
-  months: HeadcountMonthItem[];
+  granularity: HeadcountGranularity;
+  periods: HeadcountPeriodItem[];
 }
 
 export interface RecentChangeItem {
@@ -53,6 +56,12 @@ export interface RecentChangeItem {
   beforeCurrency: string | null;
   afterAmount: string;
   afterCurrency: string;
+}
+
+/** Count of active (ongoing) compensation records per currency code. */
+export interface PayrollCurrencyItem {
+  currency: string;
+  count: number;
 }
 
 export interface EmployeeWithoutCompensationItem {

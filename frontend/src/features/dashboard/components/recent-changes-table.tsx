@@ -25,7 +25,7 @@ import { formatAmount } from "../display";
 import { useRecentChanges } from "../hooks";
 
 export function RecentChangesTable() {
-  const { data, isLoading } = useRecentChanges(10);
+  const { data, isLoading } = useRecentChanges(5);
 
   return (
     <Card>
@@ -42,7 +42,9 @@ export function RecentChangesTable() {
           </div>
         ) : !data?.length ? (
           <div className="flex h-40 items-center justify-center rounded-b-lg border-t border-dashed">
-            <p className="text-sm text-muted-foreground">No compensation changes recorded yet</p>
+            <p className="text-sm text-muted-foreground">
+              No compensation changes recorded yet
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -52,7 +54,9 @@ export function RecentChangesTable() {
                   <TableHead>Employee</TableHead>
                   <TableHead>Before</TableHead>
                   <TableHead>After</TableHead>
-                  <TableHead className="whitespace-nowrap">Changed At</TableHead>
+                  <TableHead className="whitespace-nowrap">
+                    Changed At
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -70,9 +74,11 @@ export function RecentChangesTable() {
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {change.beforeAmount
-                        ? formatAmount(change.beforeAmount, change.beforeCurrency)
-                        : <span className="italic">New</span>}
+                      {change.beforeAmount ? (
+                        formatAmount(change.beforeAmount, change.beforeCurrency)
+                      ) : (
+                        <span className="italic">New</span>
+                      )}
                     </TableCell>
                     <TableCell className="font-medium">
                       {formatAmount(change.afterAmount, change.afterCurrency)}
