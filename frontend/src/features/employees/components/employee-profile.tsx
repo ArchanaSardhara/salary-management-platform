@@ -35,7 +35,6 @@ export function EmployeeProfile({ id }: { id: string }) {
       href={EMPLOYEE_ROUTES.list}
       className={buttonVariants({
         variant: "ghost",
-        size: "sm",
         className: "-ml-2 w-fit",
       })}
     >
