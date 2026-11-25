@@ -2,9 +2,11 @@ import { apiRequest } from "@/lib/api-client";
 
 import type {
   ForgotPasswordPayload,
+  ForgotPasswordResponse,
   LoginPayload,
   MessageResponse,
   RegisterPayload,
+  ResetPasswordPayload,
 } from "./types";
 
 export function login(payload: LoginPayload): Promise<MessageResponse> {
@@ -27,8 +29,17 @@ export function logout(): Promise<MessageResponse> {
 
 export function forgotPassword(
   payload: ForgotPasswordPayload,
+): Promise<ForgotPasswordResponse> {
+  return apiRequest<ForgotPasswordResponse>("/auth/forgot-password", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function resetPassword(
+  payload: ResetPasswordPayload,
 ): Promise<MessageResponse> {
-  return apiRequest<MessageResponse>("/auth/forgot-password", {
+  return apiRequest<MessageResponse>("/auth/reset-password", {
     method: "POST",
     body: payload,
   });

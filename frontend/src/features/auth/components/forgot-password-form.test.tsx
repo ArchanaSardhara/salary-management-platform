@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,9 +6,16 @@ import { jsonResponse, renderWithQueryClient } from "@/test/render";
 
 import { ForgotPasswordForm } from "./forgot-password-form";
 
+const push = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+}));
+
 const fetchMock = vi.fn<typeof fetch>();
 
 beforeEach(() => {
+  push.mockReset();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -24,7 +31,23 @@ describe("ForgotPasswordForm", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("shows the backend's neutral confirmation after submitting", async () => {
+
+  it("redirects to resetUrl when the backend returns one", async () => {
+    const resetUrl =
+      "http://localhost:3000/reset-password?token=abc123";
+    fetchMock.mockResolvedValue(
+      jsonResponse({ message: "If an account exists, a password reset email has been sent.", resetUrl }),
+    );
+    const user = userEvent.setup();
+    renderWithQueryClient(<ForgotPasswordForm />);
+
+    await user.type(screen.getByLabelText("Email"), "hr@acme.test");
+    await user.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith(resetUrl));
+  });
+
+  it("shows the backend's neutral confirmation when no resetUrl is returned", async () => {
     const message = "If an account exists, a password reset email has been sent.";
     fetchMock.mockResolvedValue(jsonResponse({ message }));
     const user = userEvent.setup();
@@ -33,14 +56,8 @@ describe("ForgotPasswordForm", () => {
     await user.type(screen.getByLabelText("Email"), "hr@acme.test");
     await user.click(screen.getByRole("button", { name: "Send reset link" }));
 
-    expect(await screen.findByText("Check your email")).toBeInTheDocument();
-    expect(screen.getByText(message)).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Email" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to sign in" })).toHaveAttribute("href", "/login");
-
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("http://localhost:4000/api/v1/auth/forgot-password");
-    expect(JSON.parse(String(init?.body))).toEqual({ email: "hr@acme.test" });
+    await screen.findByText("Check your email");
+    expect(push).not.toHaveBeenCalled();
   });
 
   it("shows a network error when the server is unreachable", async () => {

@@ -3,12 +3,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
-import { forgotPassword, login, logout, register } from "./api";
+import { forgotPassword, login, logout, register, resetPassword } from "./api";
 import { AUTH_ROUTES } from "./routes";
 import type {
   ForgotPasswordPayload,
   LoginPayload,
   RegisterPayload,
+  ResetPasswordPayload,
 } from "./types";
 
 export function useLogin() {
@@ -36,8 +37,21 @@ export function useRegister() {
 }
 
 export function useForgotPassword() {
+  const router = useRouter();
+
   return useMutation({
     mutationFn: (payload: ForgotPasswordPayload) => forgotPassword(payload),
+    onSuccess: (data) => {
+      if (data.resetUrl) {
+        router.push(data.resetUrl);
+      }
+    },
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (payload: ResetPasswordPayload) => resetPassword(payload),
   });
 }
 
