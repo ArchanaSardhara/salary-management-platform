@@ -18,6 +18,28 @@ enum Role {
   ADMIN
 }
 
+enum AuthAction {
+  LOGIN
+  FORGOT_PASSWORD
+  RESET_PASSWORD
+}
+
+/// Tracks failed authentication attempts per identifier (email or IP) and
+/// action so that accounts can be locked after repeated failures.
+model AuthAttempt {
+  id          String     @id @default(cuid())
+  identifier  String
+  action      AuthAction
+  attempts    Int        @default(0)
+  lockedUntil DateTime?  @map("locked_until")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@unique([identifier, action])
+  @@index([lockedUntil])
+  @@map("auth_attempts")
+}
+
 model User {
   id String @id @default(cuid())
 

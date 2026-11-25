@@ -7,6 +7,7 @@ import { hashToken } from '../../../common/utils/token.util';
 import type { EmailService } from '../notifications/email/email.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { UsersService } from '../users/users.service';
+import type { AuthAttemptService } from './auth-attempt.service';
 import { AuthService } from './auth.service';
 
 jest.mock('argon2', () => ({
@@ -26,6 +27,11 @@ describe('AuthService', () => {
   };
   const emailService = {
     sendPasswordResetEmail: jest.fn(),
+  };
+  const authAttemptService = {
+    checkLockout: jest.fn(),
+    recordAttempt: jest.fn(),
+    clearAttempts: jest.fn(),
   };
   const prisma = {
     $transaction: jest.fn(),
@@ -78,11 +84,15 @@ describe('AuthService', () => {
     );
     prisma.$transaction.mockResolvedValue([]);
     emailService.sendPasswordResetEmail.mockResolvedValue(undefined);
+    authAttemptService.checkLockout.mockResolvedValue(undefined);
+    authAttemptService.recordAttempt.mockResolvedValue(undefined);
+    authAttemptService.clearAttempts.mockResolvedValue(undefined);
     service = new AuthService(
       usersService as unknown as UsersService,
       jwtService as unknown as JwtService,
       emailService as unknown as EmailService,
       prisma as unknown as PrismaService,
+      authAttemptService as unknown as AuthAttemptService,
     );
   });
 
@@ -300,7 +310,7 @@ describe('AuthService', () => {
       (argon2.hash as jest.Mock).mockResolvedValue('new-hash');
 
       await expect(
-        service.resetPassword('raw-token', 'newPassword1'),
+        service.resetPassword('raw-token', 'newPassword1', '127.0.0.1'),
       ).resolves.toEqual({ message: 'Password reset successfully' });
 
       expect(prisma.passwordResetToken.findUnique).toHaveBeenCalledWith({
@@ -338,7 +348,7 @@ describe('AuthService', () => {
       prisma.passwordResetToken.findUnique.mockResolvedValue(stored);
 
       await expect(
-        service.resetPassword('raw-token', 'newPassword1'),
+        service.resetPassword('raw-token', 'newPassword1', '127.0.0.1'),
       ).rejects.toThrow(
         new UnauthorizedException('Invalid or expired reset token'),
       );

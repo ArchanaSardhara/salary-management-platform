@@ -129,7 +129,8 @@ export class AuthController {
 
   @Post('reset-password')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto.token, dto.password);
+  resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
+    const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+    return this.authService.resetPassword(dto.token, dto.password, ip);
   }
 }

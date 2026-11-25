@@ -21,6 +21,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { generateToken, hashToken } from '../../../common/utils/token.util';
 import type { Response } from 'express';
 import { EmailService } from '../notifications/email/email.service';
+import { AuthAttemptService } from './auth-attempt.service';
+import { AuthAction } from '../../../generated/prisma/enums';
 
 const ACCOUNT_DEACTIVATED = 'Account is deactivated';
 
@@ -33,6 +35,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
     private readonly prisma: PrismaService,
+    private readonly authAttemptService: AuthAttemptService,
   ) {}
 
   private async generateTokens(
@@ -111,9 +114,12 @@ export class AuthService {
   }
 
   async login(data: LoginDto) {
+    await this.authAttemptService.checkLockout(data.email, AuthAction.LOGIN);
+
     const user = await this.usersService.findByEmail(data.email);
 
     if (!user) {
+      await this.authAttemptService.recordAttempt(data.email, AuthAction.LOGIN);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -123,6 +129,7 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
+      await this.authAttemptService.recordAttempt(data.email, AuthAction.LOGIN);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -132,6 +139,7 @@ export class AuthService {
       throw new ForbiddenException(ACCOUNT_DEACTIVATED);
     }
 
+    await this.authAttemptService.clearAttempts(data.email, AuthAction.LOGIN);
     return await this.generateTokens(user, data.rememberMe);
   }
 
@@ -142,11 +150,20 @@ export class AuthService {
   async forgotPassword(
     email: string,
   ): Promise<{ message: string; resetUrl?: string }> {
+    await this.authAttemptService.checkLockout(
+      email,
+      AuthAction.FORGOT_PASSWORD,
+    );
+
     const message =
       'If an account exists, a password reset email has been sent.';
     const user = await this.usersService.findByEmail(email);
 
     if (!user) {
+      await this.authAttemptService.recordAttempt(
+        email,
+        AuthAction.FORGOT_PASSWORD,
+      );
       return { message };
     }
 
@@ -182,10 +199,16 @@ export class AuthService {
       this.logger.error('Failed to send password reset email', err);
     }
 
+    await this.authAttemptService.recordAttempt(
+      email,
+      AuthAction.FORGOT_PASSWORD,
+    );
     return { message };
   }
 
-  async resetPassword(token: string, password: string) {
+  async resetPassword(token: string, password: string, ip: string) {
+    await this.authAttemptService.checkLockout(ip, AuthAction.RESET_PASSWORD);
+
     const tokenHash = hashToken(token);
 
     const resetToken = await this.prisma.passwordResetToken.findUnique({
@@ -197,22 +220,16 @@ export class AuthService {
       },
     });
 
-    if (!resetToken) {
+    const invalidToken = async () => {
+      await this.authAttemptService.recordAttempt(ip, AuthAction.RESET_PASSWORD);
       throw new UnauthorizedException('Invalid or expired reset token');
-    }
+    };
 
-    if (resetToken.usedAt) {
-      throw new UnauthorizedException('Invalid or expired reset token');
-    }
-
-    if (resetToken.expiresAt <= new Date()) {
-      throw new UnauthorizedException('Invalid or expired reset token');
-    }
-
+    if (!resetToken) return invalidToken();
+    if (resetToken.usedAt) return invalidToken();
+    if (resetToken.expiresAt <= new Date()) return invalidToken();
     // Same error as an invalid token, so deactivation is not revealed.
-    if (!resetToken.user.isActive) {
-      throw new UnauthorizedException('Invalid or expired reset token');
-    }
+    if (!resetToken.user.isActive) return invalidToken();
 
     const passwordHash = await argon2.hash(password);
 
@@ -245,6 +262,18 @@ export class AuthService {
           revokedAt: new Date(),
         },
       }),
+    ]);
+
+    await Promise.all([
+      this.authAttemptService.clearAttempts(ip, AuthAction.RESET_PASSWORD),
+      this.authAttemptService.clearAttempts(
+        resetToken.user.email,
+        AuthAction.LOGIN,
+      ),
+      this.authAttemptService.clearAttempts(
+        resetToken.user.email,
+        AuthAction.FORGOT_PASSWORD,
+      ),
     ]);
 
     return {
