@@ -1745,3 +1745,57 @@ Fix the 7 remaining items from the security audit:
 - `auth.controller.spec.ts` and `roles.guard.http.spec.ts` need their base paths updated from e.g. `/auth/register` to `/api/v1/auth/register` to match the current app config.
 
 [human note: ]
+
+---
+
+## 26. Full test-suite fix: backend and frontend
+
+### What was asked
+
+Fix all remaining failing test suites across the backend (5 suites) and frontend (all 14 files), then commit changes grouped by module.
+
+### What AI generated
+
+**Backend fixes:**
+
+- `users.service.ts` — added missing `findAll()` method (test called it; it did not exist in the service)
+- `employees.service.spec.ts` — corrected `orderBy` expectation from object form to array form (`[{ employeeNumber: 'asc' }]`) to match service implementation
+- `employees.controller.spec.ts` — prefixed all route paths with `/api/v1`; split ADMIN access-control tests into `hrOnlyRoutes` (write operations only) since ADMIN can read but not create/update/delete employees
+- `compensation.service.spec.ts` — added `findFirst: jest.fn()` to `auditLogModel`; rewrote `findAuditLog` test to mock `auditLogModel.findFirst` separately
+- `compensation.controller.spec.ts` — prefixed all route paths with `/api/v1`; split ADMIN access-control test to `hrOnlyRoutes` (POST only)
+- `roles.guard.http.spec.ts` — prefixed all route paths with `/api/v1`
+- `auth.controller.spec.ts` — prefixed all route paths with `/api/v1`
+
+**Frontend fixes:**
+
+- `vitest.config.mts` — switched to `vmThreads` pool (Vitest 4.1.12 fails runner init with `forks`/`threads`); added `server.deps.inline` for react, react-dom, @base-ui, @tanstack, and use-sync-external-store; added matching `resolve.dedupe`
+- `src/test/setup.ts` — restored `afterEach(cleanup)`; added `ResizeObserver` stub
+- `navigation.test.ts` — updated: ADMIN also sees `/employees` nav item (can read, not write)
+- `list-params.test.ts` — added `sortBy` and `sortOrder` to two expected objects
+- `employee-directory.test.tsx` — replaced `vi.mock("next/navigation")` with `vi.mock("@/hooks/use-search-params-state")` using async factory that imports `mergeSearchParams`
+
+### Files changed
+
+**Backend:** `users.service.ts`, `roles.guard.http.spec.ts`, `auth.controller.spec.ts`, `compensation.controller.spec.ts`, `compensation.service.spec.ts`, `employees.controller.spec.ts`, `employees.service.spec.ts`
+
+**Frontend:** `vitest.config.mts`, `src/test/setup.ts`, `navigation.test.ts`, `list-params.test.ts`, `employee-directory.test.tsx`
+
+### Technical decisions
+
+- **vmThreads over forks/threads**: Vitest 4.1.12 fails runner init in `forks` and `threads`. `vmThreads` works; each test file gets its own VM context.
+- **server.deps.inline + resolve.dedupe**: React hooks fail with "multiple React instances" when packages like `@base-ui` and `use-sync-external-store` load React independently. Inlining and deduplicating ensures one shared dispatcher.
+- **Mock useSearchParamsState, not next/navigation**: `vi.mock("next/navigation")` does not reliably intercept transitive imports in vmThreads when the hook also imports `useSearchParams`. Mocking the hook boundary is cleaner.
+- **ResizeObserver stub in global setup**: `EmployeeDirectory` uses ResizeObserver for filter-bar measurement; jsdom does not implement it.
+- **Role split in controller specs**: ADMIN is blocked from write operations only. Tests now assert 403 only for `hrOnlyRoutes`.
+
+### Tests executed and results
+
+**Backend:** `npm test -- --passWithNoTests` → **286 tests passed**, 23 suites, 0 failed
+
+**Frontend:** `npm test -- --no-coverage` → **96 tests passed**, 14 files, 0 failed
+
+### Outstanding issues / limitations
+
+None. All backend and frontend tests pass.
+
+[human note: ]
