@@ -18,7 +18,11 @@ export function formatAmount(
     style: "currency",
     currency,
     maximumFractionDigits: 0,
-  }).format(num);
+  })
+    .formatToParts(num)
+    .map((part) => (part.type === "currency" ? `${part.value} ` : part.value))
+    .join("")
+    .trim();
 }
 
 /** "2026-01" → "Jan" (short month for chart axis). */

@@ -64,15 +64,17 @@ export function NoCompensationTable() {
                 {data.map((employee) => (
                   <TableRow key={employee.id}>
                     <TableCell className="whitespace-nowrap">
-                      <Link
-                        href={EMPLOYEE_ROUTES.detail(employee.id)}
-                        className="font-medium hover:underline underline-offset-4 focus-visible:underline"
-                      >
-                        {getFullName(employee)}
-                      </Link>
-                      <span className="ml-1 font-mono text-xs text-muted-foreground">
-                        {employee.employeeCode}
-                      </span>
+                      <div className="flex flex-col">
+                        <Link
+                          href={EMPLOYEE_ROUTES.detail(employee.id)}
+                          className="font-medium hover:underline underline-offset-4 focus-visible:underline"
+                        >
+                          {getFullName(employee)}
+                        </Link>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {employee.employeeCode}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {employee.department}

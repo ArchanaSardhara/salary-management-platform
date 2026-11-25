@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { EMPLOYEE_ROUTES } from "@/features/employees/routes";
 
 import { formatAmount } from "../display";
@@ -63,15 +63,17 @@ export function RecentChangesTable() {
                 {data.map((change) => (
                   <TableRow key={change.id}>
                     <TableCell className="whitespace-nowrap">
-                      <Link
-                        href={EMPLOYEE_ROUTES.detail(change.employeeId)}
-                        className="font-medium hover:underline underline-offset-4 focus-visible:underline"
-                      >
-                        {change.employeeName}
-                      </Link>
-                      <span className="ml-1 font-mono text-xs text-muted-foreground">
-                        {change.employeeCode}
-                      </span>
+                      <div className="flex flex-col">
+                        <Link
+                          href={EMPLOYEE_ROUTES.detail(change.employeeId)}
+                          className="font-medium hover:underline underline-offset-4 focus-visible:underline"
+                        >
+                          {change.employeeName}
+                        </Link>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {change.employeeCode}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {change.beforeAmount ? (
@@ -84,7 +86,7 @@ export function RecentChangesTable() {
                       {formatAmount(change.afterAmount, change.afterCurrency)}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {formatDateTime(change.changedAt)}
+                      {formatDate(change.changedAt)}
                     </TableCell>
                   </TableRow>
                 ))}
