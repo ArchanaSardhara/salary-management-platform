@@ -55,16 +55,18 @@ export function LoginForm() {
 
         <Field data-invalid={!!errors.email}>
           <FieldLabel htmlFor="email">Email</FieldLabel>
-          <InputGroupInput
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="name@company.com"
-            aria-invalid={!!errors.email}
-            aria-describedby={errors.email ? "email-error" : undefined}
-            {...register("email")}
-          />
-          <FieldError id="email-error" errors={[errors.email]} />
+          <InputGroup>
+            <InputGroupInput
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="name@company.com"
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? "email-error" : undefined}
+              {...register("email")}
+            />
+            <FieldError id="email-error" errors={[errors.email]} />
+          </InputGroup>
         </Field>
 
         <Field data-invalid={!!errors.password}>
