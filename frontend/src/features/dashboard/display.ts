@@ -7,7 +7,10 @@ export const COMPENSATION_TYPE_LABELS: Record<string, string> = {
 };
 
 /** Format a Decimal string amount for display — chart tooltips and tables. */
-export function formatAmount(amount: string | null, currency: string | null): string {
+export function formatAmount(
+  amount: string | null,
+  currency: string | null,
+): string {
   if (!amount || !currency) return "—";
   const num = parseFloat(amount);
   if (Number.isNaN(num)) return amount;
@@ -21,7 +24,9 @@ export function formatAmount(amount: string | null, currency: string | null): st
 /** "2026-01" → "Jan" (short month for chart axis). */
 export function formatShortMonth(yyyyMM: string): string {
   const [year, month] = yyyyMM.split("-").map(Number);
-  return new Date(year, month - 1, 1).toLocaleString("en-GB", { month: "short" });
+  return new Date(year, month - 1, 1).toLocaleString("en-GB", {
+    month: "short",
+  });
 }
 
 /**
@@ -34,7 +39,11 @@ export function formatPeriodLabel(period: string, granularity: string): string {
     return formatShortMonth(period);
   }
   const date = new Date(`${period.slice(0, 10)}T00:00:00Z`);
-  return date.toLocaleString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  return date.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
 }
 
 /** Returns ISO date string "YYYY-MM-DD" for a date N days before today. */
@@ -63,12 +72,9 @@ export const PAYROLL_CURRENCIES = [
 
 /** Categorical chart palette — fixed order, colorblind-safe. */
 export const CHART_COLORS = [
-  "#2563eb", // blue-600
-  "#16a34a", // green-600
-  "#d97706", // amber-600
-  "#dc2626", // red-600
-  "#7c3aed", // violet-600
-  "#0891b2", // cyan-600
-  "#db2777", // pink-600
-  "#65a30d", // lime-600
+  "#a7bcea",
+  "#b698ea",
+  "#ace6c2",
+  "#d3d9cc",
+  "#edb093",
 ];
