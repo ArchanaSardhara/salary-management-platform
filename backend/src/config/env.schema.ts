@@ -22,6 +22,11 @@ export const envSchema = z.object({
     .string()
     .min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('15m'),
+  APP_URL: z.string().url().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
+  EMAIL_REPLY_TO: z.string().email().optional(),
+  EMAIL_ACCOUNT: z.string().email().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

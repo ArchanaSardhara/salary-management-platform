@@ -4,6 +4,7 @@ import * as argon2 from 'argon2';
 import type { Response } from 'express';
 import { Role } from '../../../common/authorization/role.enum';
 import { hashToken } from '../../../common/utils/token.util';
+import type { EmailService } from '../notifications/email/email.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
@@ -22,6 +23,9 @@ describe('AuthService', () => {
   };
   const jwtService = {
     signAsync: jest.fn(),
+  };
+  const emailService = {
+    sendPasswordResetEmail: jest.fn(),
   };
   const prisma = {
     $transaction: jest.fn(),
@@ -73,9 +77,11 @@ describe('AuthService', () => {
         ),
     );
     prisma.$transaction.mockResolvedValue([]);
+    emailService.sendPasswordResetEmail.mockResolvedValue(undefined);
     service = new AuthService(
       usersService as unknown as UsersService,
       jwtService as unknown as JwtService,
+      emailService as unknown as EmailService,
       prisma as unknown as PrismaService,
     );
   });
@@ -201,26 +207,28 @@ describe('AuthService', () => {
   });
 
   describe('forgotPassword', () => {
-    const genericMessage = {
-      message: 'If an account exists, a password reset email has been sent.',
-    };
+    const message =
+      'If an account exists, a password reset email has been sent.';
 
-    it('returns the generic message without creating a token for an unknown email', async () => {
+    it('returns the message without creating a token for an unknown email', async () => {
       usersService.findByEmail.mockResolvedValue(null);
 
       await expect(
         service.forgotPassword('nobody@example.com'),
-      ).resolves.toEqual(genericMessage);
+      ).resolves.toEqual({ message });
       expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
     });
 
-    it('invalidates earlier tokens and stores a hashed token valid for 15 minutes', async () => {
+    it('invalidates earlier tokens, stores a hashed token, and returns resetUrl in non-production', async () => {
+      process.env.APP_URL = 'http://localhost:3000';
       usersService.findByEmail.mockResolvedValue(user);
 
-      await expect(service.forgotPassword(user.email)).resolves.toEqual(
-        genericMessage,
-      );
+      const result = await service.forgotPassword(user.email);
 
+      expect(result.message).toBe(message);
+      expect(result.resetUrl).toMatch(
+        /^http:\/\/localhost:3000\/reset-password\?token=/,
+      );
       expect(prisma.passwordResetToken.updateMany).toHaveBeenCalledWith({
         where: { userId: 'user-1', usedAt: null },
         data: { usedAt: expect.any(Date) },
@@ -231,16 +239,50 @@ describe('AuthService', () => {
       const minutes =
         (data.expiresAt.getTime() - data.createdAt.getTime()) / 60_000;
       expect(minutes).toBeCloseTo(15, 0);
+      expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
 
-    it('returns the generic message without creating a token for a deactivated user', async () => {
+    it('sends email and returns only the message in production', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.RESEND_API_KEY = 'test-key';
+      usersService.findByEmail.mockResolvedValue(user);
+
+      const result = await service.forgotPassword(user.email);
+
+      expect(result.message).toBe(message);
+      expect(result.resetUrl).toBeUndefined();
+      expect(emailService.sendPasswordResetEmail).toHaveBeenCalledWith({
+        to: user.email,
+        firstName: user.firstName,
+        token: expect.any(String),
+      });
+    });
+
+    it('still returns the message when the email service throws', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.RESEND_API_KEY = 'test-key';
+      usersService.findByEmail.mockResolvedValue(user);
+      emailService.sendPasswordResetEmail.mockRejectedValue(
+        new Error('Resend error'),
+      );
+
+      const result = await service.forgotPassword(user.email);
+
+      expect(result.message).toBe(message);
+      expect(result.resetUrl).toBeUndefined();
+      expect(prisma.passwordResetToken.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns a deactivated message without creating a token for a deactivated user', async () => {
       usersService.findByEmail.mockResolvedValue(deactivatedUser);
 
-      await expect(service.forgotPassword(user.email)).resolves.toEqual(
-        genericMessage,
-      );
+      await expect(service.forgotPassword(user.email)).resolves.toEqual({
+        message:
+          'Your account has been deactivated. Please contact your administrator.',
+      });
       expect(prisma.passwordResetToken.updateMany).not.toHaveBeenCalled();
       expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+      expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
   });
 

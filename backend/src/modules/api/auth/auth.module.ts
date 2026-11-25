@@ -5,7 +5,7 @@ import { UsersModule } from '../users/users.module';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { AuthController } from './auth.controller';
-// import { EmailModule } from '../notifications/email/email.module';
+import { EmailModule } from '../notifications/email/email.module';
 
 @Module({
   imports: [
@@ -18,7 +18,7 @@ import { AuthController } from './auth.controller';
           : '1d',
       },
     }),
-    // EmailModule,
+    EmailModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

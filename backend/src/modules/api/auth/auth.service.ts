@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
@@ -19,16 +20,18 @@ import { IUser } from '../users/entities/user.entity';
 import { PrismaService } from '../../prisma/prisma.service';
 import { generateToken, hashToken } from '../../../common/utils/token.util';
 import type { Response } from 'express';
-// import { EmailService } from '../notifications/email/email.service';
+import { EmailService } from '../notifications/email/email.service';
 
 const ACCOUNT_DEACTIVATED = 'Account is deactivated';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-    // private readonly emailService: EmailService,
+    private readonly emailService: EmailService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -136,24 +139,27 @@ export class AuthService {
     return user;
   }
 
-  async forgotPassword(email: string) {
+  async forgotPassword(
+    email: string,
+  ): Promise<{ message: string; resetUrl?: string }> {
+    const message =
+      'If an account exists, a password reset email has been sent.';
     const user = await this.usersService.findByEmail(email);
 
-    // Deactivated users get the same response but no reset token.
-    if (!user || !user.isActive) {
+    if (!user) {
+      return { message };
+    }
+
+    if (!user.isActive) {
       return {
-        message: 'If an account exists, a password reset email has been sent.',
+        message:
+          'Your account has been deactivated. Please contact your administrator.',
       };
     }
 
     await this.prisma.passwordResetToken.updateMany({
-      where: {
-        userId: user.id,
-        usedAt: null,
-      },
-      data: {
-        usedAt: new Date(),
-      },
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
     });
 
     const token = generateToken();
@@ -162,24 +168,21 @@ export class AuthService {
     const now = new Date();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    await this.prisma.passwordResetToken.create({
-      data: {
-        tokenHash,
-        userId: user.id,
-        createdAt: now,
-        expiresAt,
-      },
-    });
+    try {
+      await this.prisma.passwordResetToken.create({
+        data: { tokenHash, userId: user.id, createdAt: now, expiresAt },
+      });
 
-    // await this.emailService.sendPasswordResetEmail({
-    //   to: user.email,
-    //   firstName: user.firstName,
-    //   token,
-    // });
+      await this.emailService.sendPasswordResetEmail({
+        to: user.email,
+        firstName: user.firstName,
+        token,
+      });
+    } catch (err) {
+      this.logger.error('Failed to send password reset email', err);
+    }
 
-    return {
-      message: 'If an account exists, a password reset email has been sent.',
-    };
+    return { message };
   }
 
   async resetPassword(token: string, password: string) {
