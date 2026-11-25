@@ -135,11 +135,21 @@ export class EmployeesService {
     const { page, pageSize } = query;
     const where = buildListWhere(query);
 
+    const sortField = query.sortBy ?? 'employeeNumber';
+    const sortDir = query.sortOrder ?? 'asc';
+    // Always append employeeNumber as a tiebreaker so pagination is stable.
+    const orderBy: Prisma.EmployeeOrderByWithRelationInput[] =
+      sortField === 'employeeNumber'
+        ? [{ employeeNumber: sortDir }]
+        : [
+            { [sortField]: sortDir } as Prisma.EmployeeOrderByWithRelationInput,
+            { employeeNumber: 'asc' },
+          ];
+
     const [employees, total] = await this.prisma.$transaction([
       this.prisma.employee.findMany({
         where,
-        // employeeNumber is unique, so the order is stable across pages.
-        orderBy: { employeeNumber: 'asc' },
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

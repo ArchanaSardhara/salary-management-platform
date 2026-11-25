@@ -19,6 +19,20 @@ import {
   SEARCH_MAX_LENGTH,
 } from '../employee.constants';
 
+export const SORT_FIELDS = [
+  'employeeNumber',
+  'firstName',
+  'email',
+  'countryCode',
+  'department',
+  'jobTitle',
+  'startDate',
+] as const;
+export type SortField = (typeof SORT_FIELDS)[number];
+
+export const SORT_ORDERS = ['asc', 'desc'] as const;
+export type SortOrder = (typeof SORT_ORDERS)[number];
+
 export const EMPLOYEE_STATUS_FILTERS = ['active', 'deleted', 'all'] as const;
 export type EmployeeStatusFilter = (typeof EMPLOYEE_STATUS_FILTERS)[number];
 
@@ -109,4 +123,14 @@ export class ListEmployeesQueryDto {
     message: `department must contain only: ${DEPARTMENTS.join(', ')}`,
   })
   department?: Department[];
+
+  @blankToUndefined
+  @IsOptional()
+  @IsIn(SORT_FIELDS)
+  sortBy?: SortField;
+
+  @blankToUndefined
+  @IsOptional()
+  @IsIn(SORT_ORDERS)
+  sortOrder?: SortOrder;
 }
