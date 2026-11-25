@@ -1,13 +1,11 @@
-import { ChartColumnIcon } from "lucide-react";
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { ROLE_LABELS, type SessionUser } from "@/features/auth/types";
+
+import { CompensationTypeChart } from "./compensation-type-chart";
+import { HeadcountTrendChart } from "./headcount-trend-chart";
+import { NoCompensationTable } from "./no-compensation-table";
+import { PayrollChart } from "./payroll-chart";
+import { RecentChangesTable } from "./recent-changes-table";
+import { StatCards } from "./stat-cards";
 
 interface DashboardOverviewProps {
   user: SessionUser;
@@ -25,26 +23,19 @@ export function DashboardOverview({ user }: DashboardOverviewProps) {
         </p>
       </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <h2>Organization overview</h2>
-          </CardTitle>
-          <CardDescription>
-            Employee counts and compensation statistics by country, department
-            and currency.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-10 text-center">
-            <ChartColumnIcon aria-hidden="true" className="size-8 text-muted-foreground" />
-            <p className="font-medium">No statistics to show yet</p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Statistics will appear here once the reporting API is available.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <StatCards />
+
+      <PayrollChart />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <CompensationTypeChart />
+        <HeadcountTrendChart />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <RecentChangesTable />
+        <NoCompensationTable />
+      </div>
     </>
   );
 }

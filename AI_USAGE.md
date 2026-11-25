@@ -1358,3 +1358,79 @@ Multiple small tasks in one session:
 - Automated tests not re-run. Endpoints not yet verified against live data.
 
 [human note: ]
+
+---
+
+## 21. Dashboard frontend — interactive analytics UI (F6)
+
+**Date:** 2026-11-25
+
+### What was asked
+
+> "Create frontend for this apis" and "can we do charts with d3 or highcharts
+> and create common chart components rather than using business logic"
+
+### What AI generated
+
+**New library:** `recharts` (chosen: Recharts — React/D3 based, free, open source).
+Must be installed: `cd frontend && npm install recharts`.
+
+**Common chart primitives (`frontend/src/components/charts/`):**
+- `bar-chart.tsx`: generic `BarChart` — takes `BarItem[]`, `renderTooltip`, `formatTick`, optional `height`/`isLoading`/`emptyMessage`. No business knowledge.
+- `donut-chart.tsx`: generic `DonutChart` — takes `DonutSlice[]`, `legend`, `renderTooltip`. Renders Recharts PieChart donut + legend row.
+- `line-chart.tsx`: generic `LineChart` — takes `LineDataPoint[]`, `LineSeries[]`, `legend`, `renderTooltip`. Renders multi-series Recharts LineChart.
+
+**Shared formatting (`frontend/src/lib/chart-format.ts`):** `formatCompact` (compact Y-axis ticks: 75000 → "75K").
+
+**Dashboard feature (`frontend/src/features/dashboard/`):**
+- `types.ts`: TypeScript types matching all 7 backend response shapes.
+- `api.ts`: 7 API functions (one per endpoint).
+- `hooks.ts`: 7 TanStack Query hooks with 2-minute `staleTime`, typed query keys.
+- `display.ts`: `COMPENSATION_TYPE_LABELS`, `formatAmount`, `formatShortMonth`, `PAYROLL_CURRENCIES`, `CHART_COLORS`.
+- `components/stat-cards.tsx`: 4 KPI tiles (Active Employees, New Hires, Comp Records, No Compensation) with warning variant on the last.
+- `components/payroll-chart.tsx`: Card with Dept/Country tabs + currency Select → formats `PayrollGroupItem[]` → `BarChart`.
+- `components/compensation-type-chart.tsx`: Card → formats `CompensationTypeBreakdown` → `DonutChart`.
+- `components/headcount-trend-chart.tsx`: Card → formats `HeadcountTrend` → `LineChart`.
+- `components/recent-changes-table.tsx`: Card + shadcn Table — links to employee profiles.
+- `components/no-compensation-table.tsx`: Card + shadcn Table — links to employee profiles.
+- `components/dashboard-overview.tsx`: replaced placeholder; renders stat cards, payroll chart, 2-column chart row, 2-column table row.
+
+### Files created or modified
+
+- `frontend/src/components/charts/bar-chart.tsx` (created)
+- `frontend/src/components/charts/donut-chart.tsx` (created)
+- `frontend/src/components/charts/line-chart.tsx` (created)
+- `frontend/src/lib/chart-format.ts` (created)
+- `frontend/src/features/dashboard/types.ts` (created)
+- `frontend/src/features/dashboard/api.ts` (created)
+- `frontend/src/features/dashboard/hooks.ts` (created)
+- `frontend/src/features/dashboard/display.ts` (created)
+- `frontend/src/features/dashboard/components/stat-cards.tsx` (created)
+- `frontend/src/features/dashboard/components/payroll-chart.tsx` (created)
+- `frontend/src/features/dashboard/components/compensation-type-chart.tsx` (created)
+- `frontend/src/features/dashboard/components/headcount-trend-chart.tsx` (created)
+- `frontend/src/features/dashboard/components/recent-changes-table.tsx` (created)
+- `frontend/src/features/dashboard/components/no-compensation-table.tsx` (created)
+- `frontend/src/features/dashboard/components/dashboard-overview.tsx` (replaced placeholder)
+
+### Technical decisions
+
+- **Common chart components** (`src/components/charts/`) have no business knowledge: they accept generic data shapes and a `renderTooltip` render-prop. Business components in `src/features/dashboard/` handle all data formatting and pass primitives to chart components.
+- **Recharts**: built on D3 internally; React-native (declarative JSX); free. Avoids imperative DOM mutations that raw D3 would need in React.
+- **Currency selector**: hardcoded to 8 common codes rather than the full `useCurrencies()` list, since the full list (~150 codes) is too long for a currency switcher.
+- **TanStack Query**: 2-minute staleTime on all dashboard queries — data is relatively slow-moving; avoids excessive re-fetches as the user navigates.
+- **Decimal amounts**: parsed to `number` only for Recharts rendering (chart values). Tooltip display re-formats the original string with `Intl.NumberFormat`.
+
+### Tests executed
+
+- TypeScript not re-run (recharts not installed; `npm install recharts` required first).
+- Not verified in a browser.
+
+### Developer action required
+
+Run in the frontend directory before starting the dev server:
+```
+npm install recharts
+```
+
+[human note: ]
