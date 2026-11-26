@@ -40,8 +40,8 @@ const EmailVerificationTemplate = `<!DOCTYPE html>
               </p>
 
               <p style="margin:0 0 24px; font-size:16px; line-height:24px;">
-                Thanks for signing up for Project Buddy. Please verify your
-                email address by clicking the button below.
+                Thanks for signing up for Salary Management. Please verify
+                your email address by clicking the button below.
               </p>
 
               <table
@@ -77,8 +77,8 @@ const EmailVerificationTemplate = `<!DOCTYPE html>
               </p>
 
               <p style="margin:0 0 16px; font-size:14px; line-height:22px; color:#525252;">
-                If you didn't create a Project Buddy account, you can safely
-                ignore this email.
+                If you didn't create a Salary Management account, you can
+                safely ignore this email.
               </p>
 
               <hr
@@ -86,8 +86,8 @@ const EmailVerificationTemplate = `<!DOCTYPE html>
               />
 
               <p style="margin:0; font-size:12px; line-height:18px; color:#737373; text-align:center;">
-                This is an automated email from Project Buddy. Please don't
-                reply to this email.
+                This is an automated email from Salary Management. Please
+                don't reply to this email.
               </p>
 
             </td>

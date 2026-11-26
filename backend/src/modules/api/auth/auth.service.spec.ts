@@ -28,6 +28,7 @@ describe('AuthService', () => {
   };
   const emailService = {
     sendPasswordResetEmail: jest.fn(),
+    sendVerificationEmail: jest.fn(),
   };
   const authAttemptService = {
     checkLockout: jest.fn(),
@@ -50,6 +51,11 @@ describe('AuthService', () => {
       update: jest.fn(),
       updateMany: jest.fn(),
     },
+    emailVerificationToken: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
   };
   let service: AuthService;
 
@@ -59,11 +65,12 @@ describe('AuthService', () => {
     lastName: null,
     email: 'ada@example.com',
     passwordHash: 'stored-hash',
-    emailVerified: false,
+    emailVerified: true,
     role: Role.HR_MANAGER,
     isActive: true,
   };
   const deactivatedUser = { ...user, isActive: false };
+  const unverifiedUser = { ...user, emailVerified: false };
 
   const originalEnv = process.env;
 
@@ -86,7 +93,9 @@ describe('AuthService', () => {
     );
     prisma.$transaction.mockResolvedValue([]);
     prisma.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.emailVerificationToken.create.mockResolvedValue({});
     emailService.sendPasswordResetEmail.mockResolvedValue(undefined);
+    emailService.sendVerificationEmail.mockResolvedValue(undefined);
     authAttemptService.checkLockout.mockResolvedValue(undefined);
     authAttemptService.recordAttempt.mockResolvedValue(undefined);
     authAttemptService.clearAttempts.mockResolvedValue(undefined);
@@ -211,6 +220,18 @@ describe('AuthService', () => {
       await expect(service.login(dto)).rejects.toThrow(
         new UnauthorizedException('Invalid credentials'),
       );
+    });
+
+    it('throws UnauthorizedException for a user who has not verified their email', async () => {
+      usersService.findByEmail.mockResolvedValue(unverifiedUser);
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.login(dto)).rejects.toThrow(
+        new UnauthorizedException(
+          'Please verify your email address before logging in',
+        ),
+      );
+      expect(jwtService.signAsync).not.toHaveBeenCalled();
     });
   });
 
@@ -463,6 +484,59 @@ describe('AuthService', () => {
       expect(refreshCookie![2]).toEqual(
         expect.objectContaining({ httpOnly: true }),
       );
+    });
+  });
+
+  describe('verifyEmail', () => {
+    const validVerificationToken = {
+      id: 'vt-1',
+      userId: 'user-1',
+      usedAt: null,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      user,
+    };
+
+    it('marks the email as verified and the token as used', async () => {
+      prisma.emailVerificationToken.findUnique.mockResolvedValue(
+        validVerificationToken,
+      );
+
+      await expect(service.verifyEmail('raw-token')).resolves.toEqual({
+        message: 'Email verified successfully',
+      });
+
+      expect(prisma.emailVerificationToken.findUnique).toHaveBeenCalledWith({
+        where: { tokenHash: hashToken('raw-token') },
+        include: { user: true },
+      });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { emailVerified: true, updatedAt: expect.any(Date) },
+      });
+      expect(prisma.emailVerificationToken.update).toHaveBeenCalledWith({
+        where: { id: 'vt-1' },
+        data: { usedAt: expect.any(Date) },
+      });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['does not exist', null],
+      ['was already used', { ...validVerificationToken, usedAt: new Date() }],
+      [
+        'has expired',
+        {
+          ...validVerificationToken,
+          expiresAt: new Date(Date.now() - 1000),
+        },
+      ],
+    ])('rejects a token that %s', async (_label, stored) => {
+      prisma.emailVerificationToken.findUnique.mockResolvedValue(stored);
+
+      await expect(service.verifyEmail('raw-token')).rejects.toThrow(
+        new UnauthorizedException('Invalid or expired verification link'),
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
 

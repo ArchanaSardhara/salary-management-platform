@@ -28,6 +28,7 @@ import { RolesGuard } from '../../../common/authorization/roles.guard';
 import type { IUser } from '../users/entities/user.entity';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -132,5 +133,11 @@ export class AuthController {
   resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
     const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
     return this.authService.resetPassword(dto.token, dto.password, ip);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.token);
   }
 }

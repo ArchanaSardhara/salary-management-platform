@@ -40,8 +40,8 @@ const PasswordResetTemplate = `<!DOCTYPE html>
               </p>
 
               <p style="margin:0 0 24px; font-size:16px; line-height:24px;">
-                We received a request to reset your Project Buddy password.
-                Click the button below to choose a new password.
+                We received a request to reset your Salary Management
+                password. Click the button below to choose a new password.
               </p>
 
               <table
@@ -86,8 +86,8 @@ const PasswordResetTemplate = `<!DOCTYPE html>
               />
 
               <p style="margin:0; font-size:12px; line-height:18px; color:#737373; text-align:center;">
-                This is an automated email from Project Buddy. Please don't
-                reply to this email.
+                This is an automated email from Salary Management. Please
+                don't reply to this email.
               </p>
 
             </td>

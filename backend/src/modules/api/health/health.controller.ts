@@ -34,9 +34,5 @@ export class HealthController {
         },
       }),
     ]);
-    // return this.health.check([
-    //   () => this.http.pingCheck('payments', 'https://payments.example.com/health'),
-    //   () => this.disk.checkStorage('storage', { path: '/', thresholdPercent: 0.9 }),
-    // ]);
   }
 }

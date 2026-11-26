@@ -122,11 +122,31 @@ export class AuthService {
   }
 
   async register(data: RegisterDto) {
-    // create user
     const user = await this.usersService.create(data);
 
-    // access token
-    return await this.generateTokens(user!, data.rememberMe);
+    // Fire-and-forget: failure must not block account creation.
+    this.createAndSendVerificationEmail(user.id, user.email, user.firstName).catch(
+      (err: Error) => this.logger.error('Failed to send verification email', err),
+    );
+
+    return this.generateTokens(user, data.rememberMe);
+  }
+
+  private async createAndSendVerificationEmail(
+    userId: string,
+    email: string,
+    firstName: string,
+  ) {
+    const token = generateToken();
+    const tokenHash = hashToken(token);
+    const now = new Date();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 h
+
+    await this.prisma.emailVerificationToken.create({
+      data: { tokenHash, userId, createdAt: now, expiresAt },
+    });
+
+    await this.emailService.sendVerificationEmail({ to: email, firstName, token });
   }
 
   async login(data: LoginDto) {
@@ -153,6 +173,12 @@ export class AuthService {
     // to someone who doesn't know the password.
     if (!user.isActive) {
       throw new ForbiddenException(ACCOUNT_DEACTIVATED);
+    }
+
+    if (!user.emailVerified) {
+      throw new UnauthorizedException(
+        'Please verify your email address before logging in',
+      );
     }
 
     await this.authAttemptService.clearAttempts(data.email, AuthAction.LOGIN);
@@ -293,6 +319,36 @@ export class AuthService {
     return {
       message: 'Password reset successfully',
     };
+  }
+
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const tokenHash = hashToken(token);
+
+    const verificationToken = await this.prisma.emailVerificationToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (
+      !verificationToken ||
+      verificationToken.usedAt ||
+      verificationToken.expiresAt <= new Date()
+    ) {
+      throw new UnauthorizedException('Invalid or expired verification link');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: verificationToken.userId },
+        data: { emailVerified: true, updatedAt: new Date() },
+      }),
+      this.prisma.emailVerificationToken.update({
+        where: { id: verificationToken.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return { message: 'Email verified successfully' };
   }
 
   async refresh(refreshToken: string, res: Response) {

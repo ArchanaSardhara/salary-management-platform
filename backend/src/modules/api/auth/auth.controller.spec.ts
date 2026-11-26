@@ -29,6 +29,7 @@ describe('AuthController (HTTP)', () => {
     logout: jest.fn(),
     forgotPassword: jest.fn(),
     resetPassword: jest.fn(),
+    verifyEmail: jest.fn(),
   };
   /**
    * Stands in for JwtAuthGuard: sets request.user from test state (like the
@@ -325,6 +326,42 @@ describe('AuthController (HTTP)', () => {
       await request(app.getHttpServer())
         .post('/api/v1/auth/reset-password')
         .send({ token: 'bad', password: 'newPassword1' })
+        .expect(401);
+    });
+  });
+
+  describe('POST /api/v1/auth/verify-email', () => {
+    it('returns 200 and a success message for a valid token', async () => {
+      authService.verifyEmail.mockResolvedValue({
+        message: 'Email verified successfully',
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/auth/verify-email')
+        .send({ token: 'raw-token' })
+        .expect(200);
+
+      expect(res.body).toEqual({ message: 'Email verified successfully' });
+      expect(authService.verifyEmail).toHaveBeenCalledWith('raw-token');
+    });
+
+    it('returns 400 when token is missing', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/verify-email')
+        .send({})
+        .expect(400);
+
+      expect(authService.verifyEmail).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 for an invalid or expired token', async () => {
+      authService.verifyEmail.mockRejectedValue(
+        new UnauthorizedException('Invalid or expired verification link'),
+      );
+
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/verify-email')
+        .send({ token: 'bad-token' })
         .expect(401);
     });
   });
