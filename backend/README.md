@@ -82,6 +82,19 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Lint and format
+
+```bash
+# oxlint (type-aware; requires oxlint-tsgolint)
+$ npm run lint
+
+# Prettier
+$ npm run format
+$ npm run format:check
+```
+
+`npm run lint` uses `--type-aware`. If `tsgolint` cannot spawn on your machine, run `npx oxlint src/ test/` instead (same as the repo pre-push hook).
+
 ## Run tests
 
 ```bash

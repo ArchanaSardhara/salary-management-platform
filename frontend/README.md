@@ -33,7 +33,9 @@ npm install
 npm run dev         # development server on http://localhost:3000
 npm run build       # production build (also runs the TypeScript check)
 npm run start       # serve the production build
-npm run lint        # ESLint
+npm run lint        # ESLint (Next core-web-vitals + TypeScript rules)
+npm run format      # Prettier write
+npm run format:check
 npm test            # Vitest + React Testing Library (single run)
 npm run test:watch  # Vitest in watch mode
 ```
