@@ -1,0 +1,5 @@
+npm --prefix frontend run lint
+npm --prefix frontend exec -- tsc --noEmit
+npm --prefix backend exec -- oxlint src/ test/
+npm --prefix backend exec -- tsc --noEmit
+npm --prefix backend run format:check
