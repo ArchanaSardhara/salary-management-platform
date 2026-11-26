@@ -1799,3 +1799,59 @@ Fix all remaining failing test suites across the backend (5 suites) and frontend
 None. All backend and frontend tests pass.
 
 [human note: ]
+
+---
+
+## 27. Pagination for the HR Manager list
+
+### What was asked
+
+Add pagination to the HR Manager list (GET /users endpoint and the HrManagerList frontend component).
+
+### What AI generated
+
+**Backend:**
+- `list-users-query.dto.ts` — added `page` (default 1) and `pageSize` (default 20, max 100) query params using `class-validator` and `class-transformer`, following the same pattern as `ListEmployeesQueryDto`.
+- `dto/hr-manager-response.dto.ts` — NEW file: `HrManagerResponse` and `PaginatedHrManagersResponse` interfaces matching the `PaginatedEmployeesResponse` shape (`data` + `meta`).
+- `users.service.ts` — refactored `findHrManagers` to accept `{ page, pageSize, search }` and use `prisma.$transaction([findMany, count])` with `skip`/`take` for pagination. Returns `PaginatedHrManagersResponse`.
+- `users.controller.ts` — passes `page`, `pageSize`, and `search` from the DTO to the service.
+- `users.service.spec.ts` — added `count` and `$transaction` to the Prisma mock; added four new `findHrManagers` tests (paginated shape, skip/take math, search filter, totalPages rounding).
+
+**Frontend:**
+- `types.ts` — added `PaginatedHrManagersResponse` interface.
+- `api.ts` — updated `listHrManagers` to accept `page` and `pageSize` and return `PaginatedHrManagersResponse`.
+- `hooks.ts` — added `HR_MANAGER_PAGE_SIZE = 20` constant; updated `useHrManagers` to accept `page`, include it in the query key, and pass it to the API call.
+- `hr-manager-list.tsx` — added `page` state (resets to 1 on search change); switched `data` access from a flat array to `data.data`; added an `HrManagerPagination` component (Button-based, with page numbers and ellipsis, prev/next buttons, and a range indicator), following the established pattern from `employee-compensation.tsx`.
+
+### Files changed
+
+- `backend/src/modules/api/users/dto/list-users-query.dto.ts`
+- `backend/src/modules/api/users/dto/hr-manager-response.dto.ts` (new)
+- `backend/src/modules/api/users/users.service.ts`
+- `backend/src/modules/api/users/users.controller.ts`
+- `backend/src/modules/api/users/users.service.spec.ts`
+- `frontend/src/features/hr-managers/types.ts`
+- `frontend/src/features/hr-managers/api.ts`
+- `frontend/src/features/hr-managers/hooks.ts`
+- `frontend/src/features/hr-managers/components/hr-manager-list.tsx`
+
+### Technical decisions
+
+- **Page-based (not infinite scroll)**: the HR Manager list is an admin list with a small, bounded set of records. Numbered page navigation is more appropriate than infinite scroll here.
+- **`$transaction([findMany, count])`**: batches the data fetch and total count in a single round-trip, consistent with how the compensation pagination works.
+- **Page resets on search**: the search debounce effect now also calls `setPage(1)` so the user always lands on page 1 after changing the search term.
+- **Button-based pagination component**: reuses the same `getPageNumbers` + Button approach from `CompensationPagination` rather than the `<a>`-based shadcn `Pagination` component, keeping it consistent with the existing UI pattern.
+
+### Tests executed and results
+
+**Backend:** `npm test -- --testPathPatterns="users.service" --no-coverage` → **9 tests passed** (5 pre-existing + 4 new), 1 suite, 0 failed.
+
+**Backend TypeScript:** `npx tsc --noEmit` → no errors.
+
+**Frontend TypeScript:** `npx tsc --noEmit` → 1 pre-existing error in `payroll-chart.tsx` (line 87, unrelated); no errors in changed files.
+
+### Outstanding issues / limitations
+
+The pre-existing TypeScript error in `frontend/src/features/dashboard/components/payroll-chart.tsx` (line 87 — `Dispatch<SetStateAction<string>>` incompatible with `SelectRootChangeEventDetails`) was present before this feature and is not addressed here.
+
+[human note: ]

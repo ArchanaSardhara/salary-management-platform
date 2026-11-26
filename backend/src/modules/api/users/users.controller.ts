@@ -14,6 +14,10 @@ export class UserController {
 
   @Get()
   listHrManagers(@Query() query: ListUsersQueryDto) {
-    return this.userService.findHrManagers(query.search);
+    return this.userService.findHrManagers({
+      page: query.page,
+      pageSize: query.pageSize,
+      search: query.search,
+    });
   }
 }

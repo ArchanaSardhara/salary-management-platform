@@ -7,3 +7,13 @@ export interface HrManager {
   isActive: boolean;
   createdAt: string;
 }
+
+export interface PaginatedHrManagersResponse {
+  data: HrManager[];
+  meta: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}

@@ -14,7 +14,9 @@ describe('UsersService', () => {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
+      count: jest.fn(),
     },
+    $transaction: jest.fn(),
   };
   let service: UsersService;
 
@@ -108,6 +110,51 @@ describe('UsersService', () => {
       prisma.user.findMany.mockResolvedValue([dbUser]);
 
       await expect(service.findAll()).resolves.toEqual([dbUser]);
+    });
+  });
+
+  describe('findHrManagers', () => {
+    const params = { page: 1, pageSize: 20 };
+
+    it('returns paginated HR managers with meta', async () => {
+      prisma.$transaction.mockResolvedValue([[dbUser], 1]);
+
+      const result = await service.findHrManagers(params);
+
+      expect(result).toEqual({
+        data: [dbUser],
+        meta: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+      });
+    });
+
+    it('calculates skip from page and pageSize', async () => {
+      prisma.$transaction.mockResolvedValue([[], 15]);
+
+      await service.findHrManagers({ page: 2, pageSize: 10 });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10, take: 10 }),
+      );
+    });
+
+    it('applies the search filter when provided', async () => {
+      prisma.$transaction.mockResolvedValue([[dbUser], 1]);
+
+      await service.findHrManagers({ ...params, search: 'ada' });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ OR: expect.any(Array) }),
+        }),
+      );
+    });
+
+    it('totalPages rounds up', async () => {
+      prisma.$transaction.mockResolvedValue([[], 21]);
+
+      const result = await service.findHrManagers({ page: 1, pageSize: 20 });
+
+      expect(result.meta.totalPages).toBe(2);
     });
   });
 });

@@ -4,6 +4,7 @@ import * as argon2 from 'argon2';
 import { Role } from '../../../common/authorization/role.enum';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import type { PaginatedHrManagersResponse } from './dto/hr-manager-response.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { IUser } from './entities/user.entity';
 
@@ -56,7 +57,12 @@ export class UsersService {
     });
   }
 
-  async findHrManagers(search?: string) {
+  async findHrManagers(params: {
+    page: number;
+    pageSize: number;
+    search?: string;
+  }): Promise<PaginatedHrManagersResponse> {
+    const { page, pageSize, search } = params;
     const where = search
       ? {
           role: Role.HR_MANAGER,
@@ -68,11 +74,26 @@ export class UsersService {
         }
       : { role: Role.HR_MANAGER };
 
-    return this.prisma.user.findMany({
-      where,
-      omit: { passwordHash: true },
-      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
-    });
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        omit: { passwordHash: true },
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    };
   }
 
   async findById(id: string): Promise<IUser | null> {
