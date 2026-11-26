@@ -2,10 +2,13 @@ node_modules
 
 # output folder
 dist
+dist-seed
+tsconfig.build.tsbuildinfo
 
 # Keep environment variables out of version control
 .env
 
+# prisma generated 
 /src/generated/prisma
 
 

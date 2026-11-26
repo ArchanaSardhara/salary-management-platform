@@ -24,7 +24,13 @@ import { EmployeeCompensation } from "./employee-compensation";
 import { EmployeeNotFound, isNotFoundError } from "./employee-not-found";
 import { EmployeeStatusBadge } from "./employee-status-badge";
 
-export function EmployeeProfile({ id, readOnly }: { id: string; readOnly?: boolean }) {
+export function EmployeeProfile({
+  id,
+  readOnly,
+}: {
+  id: string;
+  readOnly?: boolean;
+}) {
   const employee = useEmployee(id);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
     null,
@@ -38,7 +44,7 @@ export function EmployeeProfile({ id, readOnly }: { id: string; readOnly?: boole
         className: "-ml-2 w-fit",
       })}
     >
-      <ArrowLeftIcon aria-hidden="true" size="sm" />
+      <ArrowLeftIcon aria-hidden="true" size={14} />
       Employees
     </Link>
   );

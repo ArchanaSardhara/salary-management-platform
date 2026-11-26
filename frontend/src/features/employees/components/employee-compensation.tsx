@@ -260,7 +260,7 @@ function CompensationRow({
         </TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-0.5">
-            {!readOnly && (
+            {!readOnly && !record.effectiveTo && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -415,7 +415,13 @@ function CompensationPagination({
 // Main export
 // ---------------------------------------------------------------------------
 
-export function EmployeeCompensation({ employeeId, readOnly }: { employeeId: string; readOnly?: boolean }) {
+export function EmployeeCompensation({
+  employeeId,
+  readOnly,
+}: {
+  employeeId: string;
+  readOnly?: boolean;
+}) {
   const [page, setPage] = useState(1);
   const { data, isPending, isError, error, refetch } = useCompensationRecords(
     employeeId,

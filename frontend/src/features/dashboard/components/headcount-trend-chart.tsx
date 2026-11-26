@@ -4,36 +4,54 @@ import { useState } from "react";
 import { CalendarIcon } from "lucide-react";
 
 import { LineChart } from "@/components/charts/line-chart";
-import type { LineDataPoint, LineSeries, LineChartLegendItem } from "@/components/charts/line-chart";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type {
+  LineDataPoint,
+  LineSeries,
+  LineChartLegendItem,
+} from "@/components/charts/line-chart";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { formatNumber } from "@/lib/format";
 
 import { CHART_COLORS, daysAgo, formatPeriodLabel, todayISO } from "../display";
 import { useHeadcountTrend } from "../hooks";
 import type { HeadcountPeriodItem, HeadcountTrend } from "../types";
+import { cn } from "cn";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const SERIES: LineSeries[] = [
-  { key: "active",   name: "Active",    color: CHART_COLORS[0] },
+  { key: "active", name: "Active", color: CHART_COLORS[0] },
   { key: "newHires", name: "New Hires", color: CHART_COLORS[1] },
 ];
 
-const LEGEND: LineChartLegendItem[] = SERIES.map((s) => ({ label: s.name, color: s.color }));
+const LEGEND: LineChartLegendItem[] = SERIES.map((s) => ({
+  label: s.name,
+  color: s.color,
+}));
 
 type PeriodPreset = "7d" | "1m" | "6m" | "1y" | "custom";
 
 const PRESETS: { value: PeriodPreset; label: string; days: number }[] = [
-  { value: "7d", label: "7D",  days: 7 },
-  { value: "1m", label: "1M",  days: 30 },
-  { value: "6m", label: "6M",  days: 183 },
-  { value: "1y", label: "1Y",  days: 365 },
+  { value: "7d", label: "7D", days: 7 },
+  { value: "1m", label: "1M", days: 30 },
+  { value: "6m", label: "6M", days: 183 },
+  { value: "1y", label: "1Y", days: 365 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -48,19 +66,27 @@ function toDataPoints(trend: HeadcountTrend): LineDataPoint[] {
   }));
 }
 
-function TrendTooltip(label: string, points: Array<{ name: string; value: number; color: string }>) {
+function TrendTooltip(
+  label: string,
+  points: Array<{ name: string; value: number; color: string }>,
+) {
   return (
     <div className="px-3 py-2 text-sm space-y-1">
       <p className="font-medium">{label}</p>
       {points.map((p) => (
-        <p key={p.name} className="flex items-center gap-1.5 text-muted-foreground">
+        <p
+          key={p.name}
+          className="flex items-center gap-1.5 text-muted-foreground"
+        >
           <span
             className="inline-block size-2 rounded-full flex-shrink-0"
             style={{ backgroundColor: p.color }}
             aria-hidden="true"
           />
           {p.name}:
-          <span className="text-foreground font-medium">{formatNumber(p.value)}</span>
+          <span className="text-foreground font-medium">
+            {formatNumber(p.value)}
+          </span>
         </p>
       ))}
     </div>
@@ -79,7 +105,13 @@ interface PeriodControlsProps {
   onCustomChange: (start: string, end: string) => void;
 }
 
-function PeriodControls({ preset, customStart, customEnd, onPresetChange, onCustomChange }: PeriodControlsProps) {
+function PeriodControls({
+  preset,
+  customStart,
+  customEnd,
+  onPresetChange,
+  onCustomChange,
+}: PeriodControlsProps) {
   const [localStart, setLocalStart] = useState(customStart);
   const [localEnd, setLocalEnd] = useState(customEnd);
 
@@ -101,20 +133,24 @@ function PeriodControls({ preset, customStart, customEnd, onPresetChange, onCust
         </Button>
       ))}
       <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant={preset === "custom" ? "default" : "outline"}
-            size="sm"
-            className="h-7 px-2.5 text-xs gap-1"
-          >
-            <CalendarIcon className="size-3" aria-hidden="true" />
-            Custom
-          </Button>
+        <PopoverTrigger
+          className={cn(
+            buttonVariants({
+              variant: preset === "custom" ? "default" : "outline",
+              size: "sm",
+            }),
+            "h-7 px-2.5 text-xs gap-1",
+          )}
+        >
+          <CalendarIcon className="size-3" aria-hidden="true" />
+          Custom
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <Label htmlFor="trend-start" className="text-xs">From</Label>
+              <Label htmlFor="trend-start" className="text-xs">
+                From
+              </Label>
               <Input
                 id="trend-start"
                 type="date"
@@ -125,7 +161,9 @@ function PeriodControls({ preset, customStart, customEnd, onPresetChange, onCust
               />
             </div>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="trend-end" className="text-xs">To</Label>
+              <Label htmlFor="trend-end" className="text-xs">
+                To
+              </Label>
               <Input
                 id="trend-end"
                 type="date"
@@ -136,7 +174,12 @@ function PeriodControls({ preset, customStart, customEnd, onPresetChange, onCust
                 onChange={(e) => setLocalEnd(e.target.value)}
               />
             </div>
-            <Button size="sm" className="w-full" onClick={applyCustom} disabled={!localStart || !localEnd}>
+            <Button
+              size="sm"
+              className="w-full"
+              onClick={applyCustom}
+              disabled={!localStart || !localEnd}
+            >
               Apply
             </Button>
           </div>
@@ -157,7 +200,10 @@ export function HeadcountTrendChart() {
 
   const { startDate, endDate } = (() => {
     if (preset === "custom") {
-      return { startDate: customStart || undefined, endDate: customEnd || undefined };
+      return {
+        startDate: customStart || undefined,
+        endDate: customEnd || undefined,
+      };
     }
     const days = PRESETS.find((p) => p.value === preset)!.days;
     return { startDate: daysAgo(days), endDate: todayISO() };
@@ -182,7 +228,9 @@ export function HeadcountTrendChart() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle>Headcount Trend</CardTitle>
-            <CardDescription>Active employees and new hires over time</CardDescription>
+            <CardDescription>
+              Active employees and new hires over time
+            </CardDescription>
           </div>
           <PeriodControls
             preset={preset}

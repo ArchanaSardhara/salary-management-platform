@@ -51,27 +51,27 @@ export class CompensationService {
       throw new BadRequestException(COMPENSATION_MESSAGES.endBeforeStart);
     }
 
-    const overlap = await this.prisma.compensationRecord.findFirst({
-      where: {
-        employeeId,
-        AND: [
-          // existing record ends on or after new record starts (or is open-ended)
-          {
-            OR: [
-              { effectiveTo: null },
-              { effectiveTo: { gte: effectiveFrom } },
-            ],
-          },
-          // only add start-of-existing check when new record has an end date
-          ...(effectiveTo ? [{ effectiveFrom: { lte: effectiveTo } }] : []),
-        ],
-      },
-    });
-    if (overlap) {
-      throw new ConflictException(COMPENSATION_MESSAGES.overlap);
-    }
-
     return this.prisma.$transaction(async (tx) => {
+      const overlap = await this.prisma.compensationRecord.findFirst({
+        where: {
+          employeeId,
+          AND: [
+            // existing record ends on or after new record starts (or is open-ended)
+            {
+              OR: [
+                { effectiveTo: null },
+                { effectiveTo: { gte: effectiveFrom } },
+              ],
+            },
+            // only add start-of-existing check when new record has an end date
+            ...(effectiveTo ? [{ effectiveFrom: { lte: effectiveTo } }] : []),
+          ],
+        },
+      });
+      if (overlap) {
+        throw new ConflictException(COMPENSATION_MESSAGES.overlap);
+      }
+
       const previous = await tx.compensationRecord.findFirst({
         where: { employeeId },
         orderBy: { createdAt: 'desc' },
@@ -163,27 +163,27 @@ export class CompensationService {
       throw new BadRequestException(COMPENSATION_MESSAGES.endBeforeStart);
     }
 
-    // Check no other record overlaps with the updated [effectiveFrom, effectiveTo].
-    const overlap = await this.prisma.compensationRecord.findFirst({
-      where: {
-        employeeId,
-        id: { not: recordId },
-        AND: [
-          {
-            OR: [
-              { effectiveTo: null },
-              { effectiveTo: { gte: record.effectiveFrom } },
-            ],
-          },
-          ...(effectiveTo ? [{ effectiveFrom: { lte: effectiveTo } }] : []),
-        ],
-      },
-    });
-    if (overlap) {
-      throw new ConflictException(COMPENSATION_MESSAGES.overlap);
-    }
-
     return this.prisma.$transaction(async (tx) => {
+      // Check no other record overlaps with the updated [effectiveFrom, effectiveTo].
+      const overlap = await this.prisma.compensationRecord.findFirst({
+        where: {
+          employeeId,
+          id: { not: recordId },
+          AND: [
+            {
+              OR: [
+                { effectiveTo: null },
+                { effectiveTo: { gte: record.effectiveFrom } },
+              ],
+            },
+            ...(effectiveTo ? [{ effectiveFrom: { lte: effectiveTo } }] : []),
+          ],
+        },
+      });
+      if (overlap) {
+        throw new ConflictException(COMPENSATION_MESSAGES.overlap);
+      }
+
       const before = toCompensationSnapshot(record);
       const updated = await tx.compensationRecord.update({
         where: { id: recordId },
