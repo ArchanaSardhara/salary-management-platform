@@ -1855,3 +1855,86 @@ Add pagination to the HR Manager list (GET /users endpoint and the HrManagerList
 The pre-existing TypeScript error in `frontend/src/features/dashboard/components/payroll-chart.tsx` (line 87 — `Dispatch<SetStateAction<string>>` incompatible with `SelectRootChangeEventDetails`) was present before this feature and is not addressed here.
 
 [human note: ]
+
+---
+
+## 28. Email verification flow (Resend integration + verify-email endpoint + frontend page)
+
+**Date:** 2026-11-26
+
+### What was asked
+
+> "Let's do it with Resend, add placeholder for key and make implementation"
+> (following an analysis of email service issues for register and forgot-password flows)
+
+### What AI generated
+
+**Database / Prisma:**
+- `backend/prisma/schema.prisma` — added `EmailVerificationToken` model with `tokenHash`, `userId`, `expiresAt`, `usedAt`, `createdAt`; added back-relation `emailVerificationTokens` to the `User` model.
+- `backend/prisma/migrations/20261126062044_add_email_verification_tokens/migration.sql` — Prisma-generated migration SQL, plus a manually appended `UPDATE "users" SET "email_verified" = true WHERE "email_verified" = false` to grandfather all existing users so they are not locked out.
+- The UPDATE was also applied directly to the live Neon database via `prisma db execute --stdin`.
+
+**Backend:**
+- `email.service.ts` — fixed the recipient override bug (was sending to `process.env.EMAIL_ACCOUNT` instead of `options.to`); switched to lazy Resend initialization (returns `null` when `RESEND_API_KEY` is absent, logs a warning and returns without sending); added `sendVerificationEmail({ to, firstName, token })` using `EmailVerificationTemplate`; removed `EMAIL_ACCOUNT` env var dependency.
+- `email-verification.template.ts` — NEW template ("Verify your email address", 24-hour expiry message, Salary Management branding).
+- `password-reset.template.ts`, `email-verification.template.ts` — updated branding from "Project Buddy" to "Salary Management".
+- `dto/verify-email.dto.ts` — NEW: `VerifyEmailDto` with `@IsString() @MinLength(1) token`.
+- `auth.service.ts` — `register()` fires-and-forgets `createAndSendVerificationEmail()`; `login()` now throws `UnauthorizedException` for users with `emailVerified: false`; added `verifyEmail(token)` method (hash lookup → validate → `$transaction([user.update, token.update])`).
+- `auth.controller.ts` — added `POST /auth/verify-email` endpoint returning HTTP 200.
+
+**Frontend:**
+- `features/auth/types.ts` — added `VerifyEmailPayload`.
+- `features/auth/api.ts` — added `verifyEmail()` function calling `POST /auth/verify-email`.
+- `features/auth/routes.ts` — added `verifyEmail: "/verify-email"` to `AUTH_ROUTES`.
+- `features/auth/hooks.ts` — added `useVerifyEmail()` mutation hook.
+- `features/auth/components/verify-email-view.tsx` — NEW client component: auto-calls `verifyEmail` on mount via `useEffect`; renders loading/success/error/missing-token states with `FormAlert` and login link.
+- `app/(auth)/verify-email/page.tsx` — NEW server page: reads `token` from `searchParams`, passes it to `VerifyEmailView`.
+
+**Tests:**
+- `email.service.spec.ts` — added `sendVerificationEmail` tests (renders link with URL-encoded token + firstName, throws when APP_URL missing); added no-API-key test; fixed `sendEmail` test to assert `to: ['ada@example.com']`; removed `EMAIL_ACCOUNT` env setup.
+- `auth.service.spec.ts` — added `emailVerificationToken` to Prisma mock; added `sendVerificationEmail` to email service mock; changed `user` fixture `emailVerified` from `false` to `true`; added `unverifiedUser` fixture; added login test for unverified email; added `verifyEmail` describe block (success + three invalid-token variants).
+- `auth.controller.spec.ts` — added `verifyEmail` to auth service mock; added `POST /api/v1/auth/verify-email` tests (200 success, 400 missing token, 401 invalid token).
+
+### Files changed
+
+- `backend/prisma/schema.prisma`
+- `backend/prisma/migrations/20261126062044_add_email_verification_tokens/migration.sql` (new)
+- `backend/src/modules/api/notifications/email/email.service.ts`
+- `backend/src/modules/api/notifications/email/email.service.spec.ts`
+- `backend/src/modules/api/notifications/email/templates/email-verification.template.ts` (new)
+- `backend/src/modules/api/notifications/email/templates/password-reset.template.ts`
+- `backend/src/modules/api/auth/dto/verify-email.dto.ts` (new)
+- `backend/src/modules/api/auth/auth.service.ts`
+- `backend/src/modules/api/auth/auth.service.spec.ts`
+- `backend/src/modules/api/auth/auth.controller.ts`
+- `backend/src/modules/api/auth/auth.controller.spec.ts`
+- `frontend/src/features/auth/types.ts`
+- `frontend/src/features/auth/api.ts`
+- `frontend/src/features/auth/routes.ts`
+- `frontend/src/features/auth/hooks.ts`
+- `frontend/src/features/auth/components/verify-email-view.tsx` (new)
+- `frontend/src/app/(auth)/verify-email/page.tsx` (new)
+
+### Technical decisions
+
+- **Grandfahtering existing users**: since `emailVerified` defaults to `false` and login now blocks unverified users, all existing accounts would be locked out. Solved by adding a data migration UPDATE and also applying it directly to the live database.
+- **Fire-and-forget email sending on register**: verification email failures must not break account creation. Used `.catch()` to swallow errors and log them without propagating.
+- **Lazy Resend initialization**: the `resend` field is `null` when `RESEND_API_KEY` is absent, allowing the service to degrade gracefully in local dev without email configured.
+- **Auto-trigger on mount**: the verify-email page has no form — the `VerifyEmailView` calls the API in a `useEffect` on first render, matching the UX expectation of "click link → verified immediately".
+- **Token hashing**: raw tokens are never stored; only the SHA-256 hash is persisted in the database, consistent with the refresh-token and password-reset-token patterns.
+
+### Tests executed and results
+
+**Backend (targeted):** `npm test -- --testPathPatterns="email.service|auth.service|auth.controller" --no-coverage` → **60 tests passed**, 3 suites, 0 failed.
+
+**Backend (full suite):** `npm test -- --no-coverage` → **301 tests passed**, 23 suites, 0 failed.
+
+**Frontend TypeScript:** `npx tsc --noEmit` → 1 pre-existing error in `payroll-chart.tsx:87` (unrelated); no errors in any changed file.
+
+### Outstanding issues / limitations
+
+- The pre-existing TypeScript error in `frontend/src/features/dashboard/components/payroll-chart.tsx:87` remains and is unrelated to this feature.
+- The verify-email page UI is intentionally minimal — no resend-link feature was in scope.
+- `RESEND_API_KEY` must be set in the backend `.env` for emails to be sent in production. The key is not committed; a placeholder is documented.
+
+[human note: ]
