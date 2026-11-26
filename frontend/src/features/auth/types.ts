@@ -49,3 +49,7 @@ export interface ResetPasswordPayload {
   token: string;
   password: string;
 }
+
+export interface VerifyEmailPayload {
+  token: string;
+}

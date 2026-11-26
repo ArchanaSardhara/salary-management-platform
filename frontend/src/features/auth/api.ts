@@ -7,6 +7,7 @@ import type {
   MessageResponse,
   RegisterPayload,
   ResetPasswordPayload,
+  VerifyEmailPayload,
 } from "./types";
 
 export function login(payload: LoginPayload): Promise<MessageResponse> {
@@ -40,6 +41,15 @@ export function resetPassword(
   payload: ResetPasswordPayload,
 ): Promise<MessageResponse> {
   return apiRequest<MessageResponse>("/auth/reset-password", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function verifyEmail(
+  payload: VerifyEmailPayload,
+): Promise<MessageResponse> {
+  return apiRequest<MessageResponse>("/auth/verify-email", {
     method: "POST",
     body: payload,
   });

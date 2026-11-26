@@ -3,6 +3,7 @@ export const AUTH_ROUTES = {
   register: "/register",
   forgotPassword: "/forgot-password",
   resetPassword: "/reset-password",
+  verifyEmail: "/verify-email",
   afterLogin: "/dashboard",
 } as const;
 
