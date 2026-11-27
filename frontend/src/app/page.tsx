@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+export const instant = false;
+
 import { ACCESS_TOKEN_COOKIE, AUTH_ROUTES } from "@/features/auth/routes";
 
 export default async function Home() {
