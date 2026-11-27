@@ -7,9 +7,9 @@
  * without CORS or third-party-cookie configuration.
  */
 
-import { getApiBaseUrl } from "@/lib/api-url";
+import { API_PREFIX } from "@/lib/api-url";
 
-export const API_BASE_PATH = getApiBaseUrl();
+export const API_BASE_PATH = API_PREFIX;
 
 const GENERIC_ERROR_MESSAGE = "Something went wrong. Please try again.";
 const NETWORK_ERROR_MESSAGE =
