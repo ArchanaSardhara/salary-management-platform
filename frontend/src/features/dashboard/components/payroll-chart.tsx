@@ -48,10 +48,13 @@ function PayrollTooltip(item: BarItem) {
       </p>
       <p className="text-muted-foreground">
         Avg:{" "}
-        <span className="text-foreground">{formatAmount(row.avg, row.currency)}</span>
+        <span className="text-foreground">
+          {formatAmount(row.avg, row.currency)}
+        </span>
       </p>
       <p className="text-muted-foreground">
-        Employees: <span className="text-foreground">{formatNumber(row.count)}</span>
+        Employees:{" "}
+        <span className="text-foreground">{formatNumber(row.count)}</span>
       </p>
     </div>
   );
@@ -60,7 +63,7 @@ function PayrollTooltip(item: BarItem) {
 type GroupBy = "department" | "country";
 
 export function PayrollChart() {
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState<string>("USD");
   const [groupBy, setGroupBy] = useState<GroupBy>("department");
 
   const deptQuery = usePayrollByDepartment(currency);
@@ -75,16 +78,25 @@ export function PayrollChart() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle>Payroll Breakdown</CardTitle>
-            <CardDescription>Total active compensation by group</CardDescription>
+            <CardDescription>
+              Total active compensation by group
+            </CardDescription>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Tabs value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
+            <Tabs
+              value={groupBy}
+              onValueChange={(v) => setGroupBy(v as GroupBy)}
+            >
               <TabsList>
                 <TabsTrigger value="department">Department</TabsTrigger>
                 <TabsTrigger value="country">Country</TabsTrigger>
               </TabsList>
             </Tabs>
-            <Select value={currency} onValueChange={setCurrency}>
+            <Select
+              value={currency}
+              onValueChange={(val) => setCurrency(val!)}
+              defaultValue="USD"
+            >
               <SelectTrigger className="w-24" aria-label="Select currency">
                 <SelectValue />
               </SelectTrigger>
